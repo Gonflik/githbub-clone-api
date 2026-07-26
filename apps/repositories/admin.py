@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import Repository, Star
 
-# Register your models here.
+admin.site.register(Repository)
+admin.site.register(Star)
