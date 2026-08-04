@@ -3,13 +3,12 @@ from django.conf import settings
 
 class Repository(models.Model):
     class Status(models.TextChoices):
-        PRIVATE = "PRIV", "Private"
-        PUBLIC = "PUBL", "Public"
+        PRIVATE = "PRIVATE", "Private"
+        PUBLIC = "PUBLIC", "Public"
     name = models.CharField(max_length=100)
     description = models.TextField()
-    visibility = models.CharField(max_length=4, choices=Status.choices, default=Status.PUBLIC)
+    visibility = models.CharField(max_length=7, choices=Status.choices, default=Status.PUBLIC)
     
-    stars_count = None
     open_issues_count = None
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -21,6 +20,13 @@ class Repository(models.Model):
         through="Star",
         related_name="starred_repositories"
     )
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "name"],
+                name="unique_user_reponame"
+            )
+        ]
 
     def __str__(self):
         return f"{self.id}: {self.name}"
