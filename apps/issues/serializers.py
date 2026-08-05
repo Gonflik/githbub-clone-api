@@ -1,19 +1,10 @@
 from rest_framework import serializers
-from models import Issue, Comment
+from .models import Issue, Comment
 
-
-class IssueSerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField
-    updated_at = serializers.ReadOnlyField
-
-    class Meta:
-        model = Issue
-        fields = ["id" ,"title", "description", "status", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at", "status"]
 
 class CommentSerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField
-    updated_at = serializers.ReadOnlyField
+    created_at = serializers.ReadOnlyField()
+    updated_at = serializers.ReadOnlyField()
 
     class Meta:
         model = Comment
@@ -21,3 +12,12 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class IssueSerializer(serializers.ModelSerializer):
+    created_at = serializers.ReadOnlyField()
+    updated_at = serializers.ReadOnlyField()
+    comments = CommentSerializer(many=True ,read_only=True)
+
+    class Meta:
+        model = Issue
+        fields = ["id" ,"title", "description", "status", "created_at", "updated_at", "comments"]
+        read_only_fields = ["id", "created_at", "updated_at"]
