@@ -29,6 +29,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
           if user.is_authenticated:
                 return Repository.objects.filter(Q(user=user) | Q(visibility=Repository.Status.PUBLIC))
           return Repository.objects.filter(visibility=Repository.Status.PUBLIC)
+    
     @action(detail=True, methods=["post"])
     def stars(self, request, pk=None):
         repo = self.get_object()

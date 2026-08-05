@@ -26,3 +26,7 @@ class Comment(models.Model):
 
     issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name="comments")
     user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="comments")
+
+    extra_kwargs = {
+        'contents': {'allow_blank': False}
+    }
