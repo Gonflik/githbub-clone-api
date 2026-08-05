@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.issues',
     'apps.repositories',
-    'django_extensions'
+    'django_extensions',
+    'rest_framework_simplejwt.token_blacklist'
 ]
 
 MIDDLEWARE = [

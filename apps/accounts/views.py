@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from .serializers import RegisterSerializer, UserSerializer, LoginSerializer
 from .models import CustomUser
 
@@ -64,4 +65,16 @@ class ProfileView(APIView):
         user = get_object_or_404(CustomUser, username=username)
         serializer = UserSerializer(user)
         return Response(serializer.data)
+
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response({"detail": "Refresh token required!"}, status=status.HTTP_400_BAD_REQUEST)
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({"message": "Logged out!"},status=status.HTTP_200_OK)
+        except TokenError:
+            return Response({"detail": "Invalid token!"}, status=status.HTTP_400_BAD_REQUEST)
 # Create your views here.
