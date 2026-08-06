@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, mixins
-from .models import Issue
+from .models import Issue, Comment
 from apps.repositories.models import Repository
 from .serializers import IssueSerializer, CommentSerializer
 from django.core.exceptions import PermissionDenied
@@ -66,7 +66,10 @@ class CommentViewSet(mixins.CreateModelMixin,
                      viewsets.GenericViewSet
 ):
     serializer_class = CommentSerializer
+    http_method_names = ["post", "patch", "delete"]
 
+    def get_queryset(self):
+        return Comment.objects.filter(issue=self.kwargs["issue_pk"], user=self.request.user, issue__repository_id=self.kwargs["repository_pk"])
 
     def perform_create(self, serializer):
         issue = get_object_or_404(Issue, pk=self.kwargs["issue_pk"], repository=self.kwargs["repository_pk"])

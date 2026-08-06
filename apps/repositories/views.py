@@ -17,10 +17,11 @@ class IsOwner(BasePermission):
 
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
+    http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_object(self):
             obj = get_object_or_404(Repository, pk=self.kwargs["pk"])
-            if obj.visibility == Repository.Status.PRIVATE and obj.user != self.request.user:
+            if obj.user != self.request.user:
                 raise PermissionDenied
             return obj 
 
