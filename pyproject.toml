@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "coverage>=7.15.4",
     "django>=6.0.7",
     "django-extensions>=4.1",
     "djangorestframework>=3.17.1",
@@ -19,5 +20,22 @@ dependencies = [
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py", "*_test.py", "tests.py"]
 markers = [
-    "accounts: marks test that test accounts app",
+    "accounts: marks tests that test accounts app",
+    "repositories: marks tests that test repo app",
+    "issues: marks tests that test issues app",
 ]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*apps.py",
+    "*migrations*",
+    "*settings*",
+    "*urls.py",
+    "manage.py",
+    "wsgi.py",
+    "asgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true

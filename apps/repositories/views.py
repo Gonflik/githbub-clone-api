@@ -1,29 +1,40 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import RepositorySerializer, StarSerializer
-from rest_framework.permissions import AllowAny, BasePermission
+from rest_framework.permissions import AllowAny
 from .models import Repository, Star
 
 # Create your views here.
-class IsOwner(BasePermission):
+
+
+class IsOwnerOrReadOnly(permissions.BasePermission):
       def has_object_permission(self, request, view, obj):
-            return obj.user == request.user
-
-
-
+        if request.method in permissions.SAFE_METHODS:
+             return True
+        return obj.user == request.user
+      
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
+    permission_classes = [IsOwnerOrReadOnly]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        if self.action in ["stars", "remove_star"]:
+            return [permissions.IsAuthenticated()]
+        return super().get_permissions() 
 
     def get_object(self):
-            obj = get_object_or_404(Repository, pk=self.kwargs["pk"])
-            if obj.user != self.request.user:
-                raise PermissionDenied
-            return obj 
+        obj = get_object_or_404(Repository, pk=self.kwargs["pk"])
+        if obj.visibility == Repository.Status.PRIVATE and obj.user != self.request.user:
+            raise PermissionDenied
+        self.check_object_permissions(self.request, obj)
+        return obj 
 
     def get_queryset(self):
           user = self.request.user
