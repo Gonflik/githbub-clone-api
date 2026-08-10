@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file: .env
+
+  web:
+    build: .
+    command: >
+      sh -c "uv run python manage.py migrate &&
+             uv run python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      - /app/.venv
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
