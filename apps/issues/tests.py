@@ -175,5 +175,169 @@ def test_issue_delete_repo_owner_failure(db, issue_user2, auth_client):
     assert res.status_code == 403
 
 
+@pytest.mark.comments
+def test_create_comment(db, issue, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/',
+                           data={
+                               "contents": "testcomment"
+                           })
+
+    assert res.status_code == 201
+
+@pytest.mark.comments
+def test_create_comment_unauth(db, issue, api_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = api_client.post(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/',
+                           data={
+                               "contents": "testcomment"
+                           })
+
+    assert res.status_code == 401
+
+@pytest.mark.comments
+def test_create_comment_failure(db, issue, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/',
+                           data={
+                               "contents": ""
+                           })
+
+    assert res.status_code == 400
+
+@pytest.mark.comments
+def test_create_comment_no_credentials(db, issue, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/',
+                           data={
+                               
+                           })
+
+    assert res.status_code == 400
+
+@pytest.mark.comments
+def test_create_comment_issue_wrong_repo(db, issue, repo2, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+
+    repo2_id = repo2.data['id']
+    res = auth_client.post(f'/api/repositories/{repo2_id}/issues/{issue_id}/comments/',
+                           data={
+                               "contents": "comment type beat"
+                           })
+
+    assert res.status_code == 404
+
+@pytest.mark.comments
+def test_create_comment_non_existent_issue(db, repo, auth_client):
+    repo_id = repo.data['id']
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{1}/comments/',
+                           data={
+                               "contents": "new new new"
+                           })
+
+    assert res.status_code == 404
+
+@pytest.mark.comments
+def test_update_comment(db, comment, auth_client):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client.patch(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/',
+                            data={
+                                "contents": "newcontents",
+                            })
+
+    assert res.status_code == 200
+    assert res.data['contents'] == "newcontents"
+
+@pytest.mark.comments
+def test_update_comment_non_owner(db, comment, auth_client2):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/',
+                            data={
+                                "contents": "newcontents",
+                            })
+
+    assert res.status_code == 404
+
+@pytest.mark.comments
+def test_update_comment_failure(db, comment, auth_client):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client.patch(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/',
+                            data={
+                                "contents": "",
+                            })
+
+    assert res.status_code == 400
+
+@pytest.mark.comments
+def test_delete_comment(db, comment, auth_client):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client.delete(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/'
+    )
+    assert res.status_code == 204
+
+
+@pytest.mark.comments
+def test_delete_comment_non_owner(db, comment, auth_client2):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client2.delete(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/'
+    )
+    assert res.status_code == 404
+
+
+@pytest.mark.comments
+def test_delete_comment_unauth(db, comment, api_client):
+    repo_id, issue_id, comment_id = comment
+    res = api_client.delete(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/'
+    )
+    assert res.status_code == 401
+
+
+@pytest.mark.comments
+def test_comment_wrong_issue(db, comment, issue2, auth_client):
+    repo_id, issue_id, comment_id = comment
+    issue2, repo_id = issue2
+    wrong_issue_id = issue2.data['id']
+    res = auth_client.patch(
+        f'/api/repositories/{repo_id}/issues/{wrong_issue_id}/comments/{comment_id}/',
+        data={"contents": "should not work"}
+    )
+    assert res.status_code == 404
+
+
+@pytest.mark.comments
+def test_put_not_allowed(db, comment, auth_client):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client.put(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/',
+        data={"contents": "full replace attempt"}
+    )
+    assert res.status_code == 405
+
+
+@pytest.mark.comments
+def test_list_comments_not_allowed(db, issue, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = auth_client.get(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/'
+    )
+    assert res.status_code == 405
+
+
+@pytest.mark.comments
+def test_retrieve_comment_not_allowed(db, comment, auth_client):
+    repo_id, issue_id, comment_id = comment
+    res = auth_client.get(
+        f'/api/repositories/{repo_id}/issues/{issue_id}/comments/{comment_id}/'
+    )
+    assert res.status_code == 405
 
 # Create your tests here.

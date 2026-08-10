@@ -41,6 +41,16 @@ def repo(auth_client):
     return res
 
 @pytest.fixture
+def repo2(auth_client):
+    res = auth_client.post('/api/repositories/',
+                               data={
+                                   "name": "newrepo22",
+                                   "description": "222",
+                                   "visibility": "PUBLIC"
+                               })
+    return res
+
+@pytest.fixture
 def private_repo(auth_client):
     res = auth_client.post('/api/repositories/',
                                data={
@@ -58,6 +68,28 @@ def issue(repo, auth_client):
                            data={
                                "title": "someissue",
                                "description": "issue on public repo",
+                           })
+    return (res, repo_id)
+
+@pytest.fixture
+def issue2(repo, auth_client):
+    repo_id = repo.data['id']
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/',
+                           data={
+                               "title": "someissue",
+                               "description": "issue on public repo",
+                           })
+    return (res, repo_id)
+
+@pytest.fixture
+def issue_on_repo2(repo2, auth_client):
+    repo_id = repo2.data['id']
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/',
+                           data={
+                               "title": "someissue22",
+                               "description": "issue22con on public repo",
                            })
     return (res, repo_id)
 
@@ -82,4 +114,17 @@ def issue_user2(repo, auth_client2):
                                "description": "issue on public repo",
                            })
     return (res, repo_id)
+
+@pytest.fixture
+def comment(issue, auth_client):
+    issue, repo_id = issue
+    issue_id = issue.data['id']
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_id}/comments/',
+                           data={
+                               "contents": "testcomment"
+                           })
+
+    return (repo_id, issue_id, res.data['id'])
+
+
 
