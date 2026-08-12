@@ -1,12 +1,12 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .serializers import RepositorySerializer, StarSerializer
+from .serializers import RepositorySerializer, StarSerializer, InvitationSerializer, CollaboratorSerializer
 from rest_framework.permissions import AllowAny
-from .models import Repository, Star
+from .models import Repository, Star, Invitation, Collaborator
 
 # Create your views here.
 
@@ -59,3 +59,26 @@ class RepositoryViewSet(viewsets.ModelViewSet):
                     return Response({"detail": "Not starred!"}, status=status.HTTP_409_CONFLICT)
         Star.objects.filter(user=user, repository=repo).delete()
         return Response(status=status.HTTP_200_OK)
+
+
+class CollaboratorViewSet(
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return InvitationSerializer
+        return CollaboratorSerializer
+    
+
+    def perform_create(self, serializer):
+        repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
+        #serializer.save(repository=repo, invited_by=self.request.user, invitee=)
+
+class InvitationViewSet(viewsets.GenericViewSet):
+    pass
+
+
+

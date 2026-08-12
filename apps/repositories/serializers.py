@@ -1,16 +1,15 @@
 from rest_framework import serializers
-from .models import Repository, Star
+from .models import Repository, Star, Invitation, Collaborator
 
 
 class RepositorySerializer(serializers.ModelSerializer):
-    created_at = serializers.ReadOnlyField
-    updated_at = serializers.ReadOnlyField
 
     stars_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Repository
         fields = ["id" ,"name", "description", "visibility" ,"stars_count","created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     def create(self, validated_data):
         user = self.context["request"].user
@@ -29,11 +28,21 @@ class RepositorySerializer(serializers.ModelSerializer):
 
 class StarSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    created_at = serializers.ReadOnlyField()
 
     class Meta:
         model = Star
         fields = ['id', 'user', 'repository', 'created_at']
+        read_only_fields = ["id", "created_at"]
 
 
+class InvitationSerializer(serializers.ModelSerializer):
 
+    class Meta:
+        model = Invitation
+        fields = ['id', 'invitee', 'repository', 'invited_by', 'status', 'created_at', 'updated_at']
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+class CollaboratorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Collaborator
+        fields = []

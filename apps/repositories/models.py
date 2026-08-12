@@ -53,3 +53,31 @@ class Star(models.Model):
         ]
 
 
+class Collaborator(models.Model):
+    user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="collaborations")
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="collaborators")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('repository', 'user')
+
+
+
+class Invitation(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        DECLINED = "DECLINED", "Declined"
+
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="invitations")
+    invitee = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="invitations")
+
+    invited_by = models.ForeignKey("accounts.CustomUser", on_delete=models.SET_NULL, null=True, related_name="sent_invitations")
+    status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('repository', 'invitee')
