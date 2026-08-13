@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import RepositorySerializer, StarSerializer, InvitationSerializer, CollaboratorSerializer
 from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import ValidationError 
 from .models import Repository, Star, Invitation, Collaborator
 
 # Create your views here.
@@ -16,7 +17,8 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
              return True
         return obj.user == request.user
-      
+
+
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
@@ -56,7 +58,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         repo = self.get_object()
         user = request.user
         if not Star.objects.filter(user=user, repository=repo).exists():
-                    return Response({"detail": "Not starred!"}, status=status.HTTP_409_CONFLICT)
+            return Response({"detail": "Not starred!"}, status=status.HTTP_409_CONFLICT)
         Star.objects.filter(user=user, repository=repo).delete()
         return Response(status=status.HTTP_200_OK)
 
@@ -67,18 +69,93 @@ class CollaboratorViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet
 ):
+        
     def get_serializer_class(self):
         if self.action == 'create':
             return InvitationSerializer
         return CollaboratorSerializer
+
+    def get_queryset(self):
+        return Collaborator.objects.filter(repository__pk=self.kwargs["repository_pk"])
     
 
     def perform_create(self, serializer):
         repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
-        #serializer.save(repository=repo, invited_by=self.request.user, invitee=)
 
-class InvitationViewSet(viewsets.GenericViewSet):
-    pass
+        if repo.user != self.request.user:
+            raise PermissionDenied
+
+        invitee = serializer.validated_data["invitee"]
 
 
+        if Collaborator.objects.filter(repository=repo, user=invitee).exists():
+            raise ValidationError("User is already a collaborator!")
+
+        if Invitation.objects.filter(repository=repo, invitee=invitee, status="PENDING").exists():
+            raise ValidationError("User already has a pending invitation!")
+
+        Invitation.objects.update_or_create(
+            repository=repo,
+            invitee=invitee,
+            defaults={
+                "invited_by": self.request.user,
+                "status": "PENDING"
+            }
+        )
+
+
+    def destroy(self, request, *args, **kwargs):
+        repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
+
+        if repo.user != request.user:
+            raise PermissionDenied
+        
+        return super().destroy(request, *args, **kwargs)
+
+    
+class InvitationViewSet(viewsets.GenericViewSet,
+                        mixins.ListModelMixin,
+    ):
+    def get_serializer_class(self):
+        if self.action in ["list"]:
+            return InvitationSerializer
+        return CollaboratorSerializer
+
+    def get_queryset(self):
+        return Invitation.objects.filter(invitee=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def accept(self, request, pk=None):
+        inv = self.get_object()
+        user = request.user
+
+        if user != inv.invitee:
+            raise PermissionDenied
+
+        if inv.status != "PENDING":
+            raise ValidationError("Invitation is no longer pending!")
+
+        inv.status = "ACCEPTED"
+        inv.save()
+
+        collaborator = Collaborator.objects.create(user=user, repository=inv.repository)
+        serializer = CollaboratorSerializer(collaborator)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def decline(self, request, pk=None):
+        inv = self.get_object()
+        user = request.user
+
+        if user != inv.invitee:
+            raise PermissionDenied
+
+        if inv.status != "PENDING":
+            raise ValidationError("Invitation is no longer pending!")
+
+        inv.status = "DECLINED"
+        inv.save()
+
+        return Response({"detail": "Invitation declined."}, status=status.HTTP_200_OK)
 

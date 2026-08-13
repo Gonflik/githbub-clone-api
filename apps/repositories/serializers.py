@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Repository, Star, Invitation, Collaborator
+from apps.accounts.models import CustomUser
 
 
 class RepositorySerializer(serializers.ModelSerializer):
@@ -36,13 +37,25 @@ class StarSerializer(serializers.ModelSerializer):
 
 
 class InvitationSerializer(serializers.ModelSerializer):
+    invitee = serializers.CharField()
+
+    def validate_invitee(self, value):
+        try:
+            user = CustomUser.objects.get(username=value)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("User does not exist!")
+        return user
+
+    def create(self, validated_data):
+        return Invitation.objects.create(**validated_data)
 
     class Meta:
         model = Invitation
-        fields = ['id', 'invitee', 'repository', 'invited_by', 'status', 'created_at', 'updated_at']
-        read_only_fields = ["id", "created_at", "updated_at"]
+        fields = ['id', 'invitee', 'invited_by', 'status', 'created_at', 'updated_at']
+        read_only_fields = ["id", "status", "invited_by", "created_at", "updated_at"]
 
 class CollaboratorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collaborator
-        fields = []
+        fields = ["id","user", "repository", "created_at"]
+        read_only_fields = ["id", "user", "repository" "created_at"]
