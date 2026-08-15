@@ -94,14 +94,14 @@ class CollaboratorViewSet(
         if Invitation.objects.filter(repository=repo, invitee=invitee, status="PENDING").exists():
             raise ValidationError("User already has a pending invitation!")
 
-        Invitation.objects.update_or_create(
-            repository=repo,
-            invitee=invitee,
-            defaults={
-                "invited_by": self.request.user,
-                "status": "PENDING"
-            }
-        )
+        declined_invite = Invitation.objects.filter(repository=repo, invitee=invitee, status="DECLINED")
+        if declined_invite.exists():
+            declined_invite.update(status="PENDING")
+            serializer.instance = declined_invite.first()
+            return 
+            
+
+        serializer.save(invitee=invitee, repository=repo, invited_by=self.request.user)
 
 
     def destroy(self, request, *args, **kwargs):
@@ -117,7 +117,7 @@ class InvitationViewSet(viewsets.GenericViewSet,
                         mixins.ListModelMixin,
     ):
     def get_serializer_class(self):
-        if self.action in ["list"]:
+        if self.action == "list":
             return InvitationSerializer
         return CollaboratorSerializer
 
