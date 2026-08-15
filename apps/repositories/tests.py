@@ -1,5 +1,6 @@
 import pytest
 
+
 @pytest.mark.repositories
 def test_repo_create(db, auth_client):
     res = auth_client.post('/api/repositories/',
@@ -220,4 +221,78 @@ def test_unauth_user_star_repo(db, api_client, private_repo):
     res = api_client.post(f'/api/repositories/{repo_id}/stars/')
 
     assert res.status_code == 401
+
+@pytest.mark.collaborators
+def test_invite_collaborator(db, auth_client, repo, another_user):
+    repo_id = repo.data["id"]
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    assert res.status_code == 201
+
+@pytest.mark.collaborators
+def test_non_repo_owner_invite_collaborator(db, auth_client2, repo, user):
+    repo_id = repo.data["id"]
+    res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={
+                                "invitee": "testuser",
+                            })
+    assert res.status_code == 403
+
+@pytest.mark.collaborators
+def test_accept_invite(db, auth_client2, invite_user_to_user2):
+    inv_id = invite_user_to_user2
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+    assert res.status_code == 200
+
+@pytest.mark.collaborators
+def test_non_invitee_accept_invite(db, invite_user_to_user2, auth_client3):
+    inv_id = invite_user_to_user2
+
+    res = auth_client3.post(f'/api/invitations/{inv_id}/accept/')
+    assert res.status_code == 404
+
+@pytest.mark.collaborators
+def test_invite_already_collaborator(db, collaborator, auth_client, repo):
+    repo_id = repo.data["id"]
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "anotheruser",
+                           })
+
+    assert res.status_code == 400
+
+@pytest.mark.collaborators
+def test_invite_alr_pending(db, invite_user_to_user2, auth_client, repo):
+    repo_id = repo.data["id"]
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    assert res.status_code == 400
+
+@pytest.mark.collaborators
+def test_reinvite_declined_invite(db, invite_user_to_user2, auth_client, auth_client2, repo):
+    inv_id = invite_user_to_user2
+    repo_id = repo.data["id"]
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/decline/')
+
+    
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={
+                                "invitee": "another"
+                            })
+    assert res.status_code == 201
+
+@pytest.mark.collaborators
+def test():
+    pass
+
+    
 # Create your tests here.

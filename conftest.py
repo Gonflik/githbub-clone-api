@@ -19,6 +19,10 @@ def another_user(db):
     return User.objects.create_user(username="another", email="another@gmail.com", password="testpass")
 
 @pytest.fixture
+def another_user2(db):
+    return User.objects.create_user(username="another2", email="another2@gmail.com", password="testpass")
+
+@pytest.fixture
 def auth_client(user):
     client = APIClient()
     client.force_authenticate(user=user)
@@ -29,6 +33,12 @@ def auth_client2(another_user):
     client2 = APIClient()
     client2.force_authenticate(user=another_user)
     return client2
+
+@pytest.fixture
+def auth_client3(another_user2):
+    client3 = APIClient()
+    client3.force_authenticate(user=another_user2)
+    return client3
 
 @pytest.fixture
 def repo(auth_client):
@@ -126,5 +136,21 @@ def comment(issue, auth_client):
 
     return (repo_id, issue_id, res.data['id'])
 
+@pytest.fixture
+def invite_user_to_user2(db, auth_client, another_user, repo) -> id:
+    repo_id = repo.data["id"]
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
 
+    return res.data["id"]
+
+@pytest.fixture
+def collaborator(db, auth_client2, invite_user_to_user2) -> id:
+    inv_id = invite_user_to_user2
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    return res.data["id"]
 

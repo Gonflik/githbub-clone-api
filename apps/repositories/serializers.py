@@ -37,16 +37,12 @@ class StarSerializer(serializers.ModelSerializer):
 
 
 class InvitationSerializer(serializers.ModelSerializer):
-    invitee = serializers.CharField()
+    invitee = serializers.SlugRelatedField(slug_field="username", queryset=CustomUser.objects.all())
+    invited_by = serializers.SlugRelatedField(slug_field="username", read_only=True)
 
-    def validate_invitee(self, value):
-        try:
-            user = CustomUser.objects.get(username=value)
-        except CustomUser.DoesNotExist:
-            raise serializers.ValidationError("User does not exist!")
-        return user
 
     def create(self, validated_data):
+        
         return Invitation.objects.create(**validated_data)
 
     class Meta:
