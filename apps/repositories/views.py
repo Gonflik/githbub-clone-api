@@ -8,6 +8,7 @@ from .serializers import RepositorySerializer, StarSerializer, InvitationSeriali
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError 
 from .models import Repository, Star, Invitation, Collaborator
+from apps.accounts.models import CustomUser
 
 # Create your views here.
 
@@ -62,6 +63,36 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         Star.objects.filter(user=user, repository=repo).delete()
         return Response(status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["post"])
+    def transfer(self, request, pk=None):
+        repo = self.get_object()
+        user = request.user 
+        if repo.user != user:
+            return Response({"detail": "Non-owner cant transfer repo!"}, status=status.HTTP_403_FORBIDDEN)
+
+        new_owner = get_object_or_404(CustomUser, username=request.data["user"])
+
+        Collaborator.objects.create(user=user, repository=repo)
+
+        repo.user = new_owner
+        repo.save()
+        return Response({"detail": f"Ownership succesfully transferred to '{new_owner.username}'"}, status=status.HTTP_200_OK)
+
+        
+
+
+class IsCollaboratorOrOwner(permissions.BasePermission):
+    def has_permission(self, request, view):
+        repo = get_object_or_404(Repository, pk=view.kwargs["repository_pk"])
+        user = request.user
+        
+        if not user.is_authenticated:
+            return False
+        
+        is_owner = repo.user == user
+        is_collaborator = Collaborator.objects.filter(repository=repo, user=user).exists()
+        
+        return is_owner or is_collaborator
 
 class CollaboratorViewSet(
     mixins.CreateModelMixin,
@@ -69,7 +100,11 @@ class CollaboratorViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet
 ):
-        
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [IsCollaboratorOrOwner()]
+        return super().get_permissions()
+    
     def get_serializer_class(self):
         if self.action == 'create':
             return InvitationSerializer
@@ -85,8 +120,12 @@ class CollaboratorViewSet(
         if repo.user != self.request.user:
             raise PermissionDenied
 
-        invitee = serializer.validated_data["invitee"]
+        
 
+        invitee = serializer.validated_data["invitee"]
+       
+        if self.request.user == invitee:
+            raise ValidationError("Cant invite self!")
 
         if Collaborator.objects.filter(repository=repo, user=invitee).exists():
             raise ValidationError("User is already a collaborator!")
