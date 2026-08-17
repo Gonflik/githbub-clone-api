@@ -152,5 +152,4 @@ def collaborator(db, auth_client2, invite_user_to_user2) -> id:
 
     res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
 
-    return res.data["id"]
-
+    return (res.data["id"], inv_id)
