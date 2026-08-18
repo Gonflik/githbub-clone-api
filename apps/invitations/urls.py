@@ -3,3 +3,7 @@ from .views import InvitationViewSet
 
 router = routers.DefaultRouter()
 router.register(r"invitations", InvitationViewSet, basename="invitation")
+
+urlpatterns = [
+    *router.urls,
+]

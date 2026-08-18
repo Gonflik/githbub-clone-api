@@ -22,6 +22,7 @@ from apps.accounts.views import RegisterView, LoginView, ProfileView, MeView, Lo
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('apps.repositories.urls')),
+    path('api/', include('apps.invitations.urls')),
     path('api/auth/login/', LoginView.as_view()),
     path('api/auth/register/', RegisterView.as_view()),
     path('api/users/me/', MeView.as_view()),
