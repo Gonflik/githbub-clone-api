@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Repository, Star, Collaboratorw
+from .models import Repository, Star, Collaborator
 
 
 class RepositorySerializer(serializers.ModelSerializer):
