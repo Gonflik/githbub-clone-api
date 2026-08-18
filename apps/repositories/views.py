@@ -4,10 +4,12 @@ from django.db.models import Q
 from rest_framework import viewsets, status, permissions, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .serializers import RepositorySerializer, StarSerializer, InvitationSerializer, CollaboratorSerializer
+from .serializers import RepositorySerializer, StarSerializer, CollaboratorSerializer
+from apps.invitations.serializers import InvitationSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError 
-from .models import Repository, Star, Invitation, Collaborator
+from .models import Repository, Star, Collaborator
+from apps.invitations.models import Invitation
 from apps.accounts.models import CustomUser
 
 # Create your views here.
@@ -62,7 +64,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Not starred!"}, status=status.HTTP_409_CONFLICT)
         Star.objects.filter(user=user, repository=repo).delete()
         return Response(status=status.HTTP_200_OK)
-
+    
     @action(detail=True, methods=["post"])
     def transfer(self, request, pk=None):
         repo = self.get_object()
@@ -152,49 +154,4 @@ class CollaboratorViewSet(
         return super().destroy(request, *args, **kwargs)
 
     
-class InvitationViewSet(viewsets.GenericViewSet,
-                        mixins.ListModelMixin,
-    ):
-    def get_serializer_class(self):
-        if self.action == "list":
-            return InvitationSerializer
-        return CollaboratorSerializer
-
-    def get_queryset(self):
-        return Invitation.objects.filter(invitee=self.request.user)
-
-    @action(detail=True, methods=["post"])
-    def accept(self, request, pk=None):
-        inv = self.get_object()
-        user = request.user
-
-        if user != inv.invitee:
-            raise PermissionDenied
-
-        if inv.status != "PENDING":
-            raise ValidationError("Invitation is no longer pending!")
-
-        inv.status = "ACCEPTED"
-        inv.save()
-
-        collaborator = Collaborator.objects.create(user=user, repository=inv.repository)
-        serializer = CollaboratorSerializer(collaborator)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["post"])
-    def decline(self, request, pk=None):
-        inv = self.get_object()
-        user = request.user
-
-        if user != inv.invitee:
-            raise PermissionDenied
-
-        if inv.status != "PENDING":
-            raise ValidationError("Invitation is no longer pending!")
-
-        inv.status = "DECLINED"
-        inv.save()
-
-        return Response({"detail": "Invitation declined."}, status=status.HTTP_200_OK)
 

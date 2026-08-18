@@ -20,7 +20,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'apps.accounts',
     'apps.issues',
+    'apps.invitations',
     'apps.repositories',
+    'apps.organizations',
     'django_extensions',
     'rest_framework_simplejwt.token_blacklist',
 ]

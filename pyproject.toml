@@ -25,6 +25,7 @@ markers = [
     "issues: marks tests that test issues app",
     "comments: marks test that test comments in issues app",
     "collaborators: marks test that test collaborators stuff in repo app",
+    "invitations: marks test that test invites in invitations app",
 ]
 
 [tool.coverage.run]

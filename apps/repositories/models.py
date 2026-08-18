@@ -14,7 +14,9 @@ class Repository(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="repositories")
+    user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="repositories", null=True)
+    organization = models.ForeignKey("organizations.Organization", on_delete=models.CASCADE, related_name="repositories", null=True)
+
     starred_by = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through="Star",
@@ -25,6 +27,13 @@ class Repository(models.Model):
             models.UniqueConstraint(
                 fields=["user", "name"],
                 name="unique_user_reponame"
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(user__isnull=False, organization__isnull=True) |
+                    models.Q(user__isnull=True, organization__isnull=False)
+                ),
+                name="ck_repo_has_one_owner"
             )
         ]
 
@@ -64,20 +73,3 @@ class Collaborator(models.Model):
 
 
 
-class Invitation(models.Model):
-    class Status(models.TextChoices):
-        PENDING = "PENDING", "Pending"
-        ACCEPTED = "ACCEPTED", "Accepted"
-        DECLINED = "DECLINED", "Declined"
-
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="invitations")
-    invitee = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="invitations")
-
-    invited_by = models.ForeignKey("accounts.CustomUser", on_delete=models.SET_NULL, null=True, related_name="sent_invitations")
-    status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ('repository', 'invitee')

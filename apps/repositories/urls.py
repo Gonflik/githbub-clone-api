@@ -1,10 +1,11 @@
 from rest_framework_nested import routers
 from apps.issues.views import IssueViewSet, CommentViewSet
-from .views import RepositoryViewSet, CollaboratorViewSet, InvitationViewSet
+from .views import RepositoryViewSet, CollaboratorViewSet
+
 
 router = routers.DefaultRouter()
 router.register(r"repositories", RepositoryViewSet, basename="repository")
-router.register(r"invitations", InvitationViewSet, basename="invitation")
+
 
 repo_router = routers.NestedDefaultRouter(router, "repositories", lookup="repository")
 repo_router.register("issues", IssueViewSet, basename="repository-issues")
