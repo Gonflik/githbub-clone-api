@@ -11,6 +11,6 @@ class OrganizationSerializer(serializers.ModelSerializer):
 class OrgMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrgMember
-        fields = ["id", "role", "user", "organization", "created_at", "updated_at"]
+        fields = ["id", "visibility", "role", "user", "organization", "created_at", "updated_at"]
         read_only_fields = ["id", "user", "organization", "created_at", "updated_at"]
         
