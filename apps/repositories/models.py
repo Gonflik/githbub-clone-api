@@ -5,6 +5,7 @@ class Repository(models.Model):
     class Status(models.TextChoices):
         PRIVATE = "PRIVATE", "Private"
         PUBLIC = "PUBLIC", "Public"
+
     name = models.CharField(max_length=100)
     description = models.TextField()
     visibility = models.CharField(max_length=7, choices=Status.choices, default=Status.PUBLIC)
@@ -63,6 +64,7 @@ class Star(models.Model):
 
 
 class Collaborator(models.Model):
+    #add class permission_level(read, write, admin)
     user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="collaborations")
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="collaborators")
 

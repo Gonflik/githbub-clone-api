@@ -11,21 +11,15 @@ from rest_framework.exceptions import ValidationError
 from .models import Repository, Star, Collaborator
 from apps.invitations.models import Invitation
 from apps.accounts.models import CustomUser
+from apps.common.permissions import IsOwner
 
 # Create your views here.
-
-
-class IsOwnerOrReadOnly(permissions.BasePermission):
-      def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-             return True
-        return obj.user == request.user
 
 
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [IsOwner]
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -69,8 +63,6 @@ class RepositoryViewSet(viewsets.ModelViewSet):
     def transfer(self, request, pk=None):
         repo = self.get_object()
         user = request.user 
-        if repo.user != user:
-            return Response({"detail": "Non-owner cant transfer repo!"}, status=status.HTTP_403_FORBIDDEN)
 
         new_owner = get_object_or_404(CustomUser, username=request.data["user"])
 
@@ -80,21 +72,17 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         repo.save()
         return Response({"detail": f"Ownership succesfully transferred to '{new_owner.username}'"}, status=status.HTTP_200_OK)
 
-        
 
 
-class IsCollaboratorOrOwner(permissions.BasePermission):
+class IsRepositoryOwner(permissions.BasePermission):
     def has_permission(self, request, view):
         repo = get_object_or_404(Repository, pk=view.kwargs["repository_pk"])
         user = request.user
         
         if not user.is_authenticated:
             return False
-        
-        is_owner = repo.user == user
-        is_collaborator = Collaborator.objects.filter(repository=repo, user=user).exists()
-        
-        return is_owner or is_collaborator
+
+        return repo.user == user
 
 class CollaboratorViewSet(
     mixins.CreateModelMixin,
@@ -102,10 +90,7 @@ class CollaboratorViewSet(
     mixins.ListModelMixin,
     viewsets.GenericViewSet
 ):
-    def get_permissions(self):
-        if self.action in ["list", "retrieve"]:
-            return [IsCollaboratorOrOwner()]
-        return super().get_permissions()
+    permission_classes = [IsRepositoryOwner]
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -118,11 +103,6 @@ class CollaboratorViewSet(
 
     def perform_create(self, serializer):
         repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
-
-        if repo.user != self.request.user:
-            raise PermissionDenied
-
-        
 
         invitee = serializer.validated_data["invitee"]
        
@@ -143,15 +123,6 @@ class CollaboratorViewSet(
             
 
         serializer.save(invitee=invitee, repository=repo, invited_by=self.request.user)
-
-
-    def destroy(self, request, *args, **kwargs):
-        repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
-
-        if repo.user != request.user:
-            raise PermissionDenied
-        
-        return super().destroy(request, *args, **kwargs)
 
     
 

@@ -1,49 +1,49 @@
 from django.shortcuts import render, get_object_or_404
-from rest_framework import viewsets, mixins
+from rest_framework import viewsets, mixins, permissions
 from .models import Issue, Comment
 from apps.repositories.models import Repository
 from .serializers import IssueSerializer, CommentSerializer
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
+from apps.common.permissions import IsOwner
 # Create your views here.
 
 
+class IsOwnerOrCollaboratorOrPublic(permissions.BasePermission):
+    def has_permission(self, request, view):
+        repo = get_object_or_404(Repository, pk=view.kwargs["repository_pk"])
+
+        if repo.visibility == "PUBLIC":
+            return True
+
+        if not request.user.is_authenticated:
+            return False
+
+        is_owner = repo.user == request.user    
+        is_collaborator = repo.collaborators.filter(pk=request.user.pk).exists()
+
+        return is_owner or is_collaborator
 
 
 class IssueViewSet(viewsets.ModelViewSet):
     serializer_class = IssueSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def _get_repo_or_403(self):
-        repo = get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
-
-        if repo.visibility == Repository.Status.PRIVATE and self.request.user != repo.user:
-            raise PermissionDenied
-        
-        return repo
+    permission_classes = [IsOwnerOrCollaboratorOrPublic]
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve"]:
-            return [AllowAny()]
+        if self.action in ["retrieve", "list"]:
+            return [IsOwnerOrCollaboratorOrPublic()]
+        if self.action in ["create", "partial_update"]:
+            return [permissions.IsAuthenticated(), IsOwnerOrCollaboratorOrPublic()]
+        if self.action == "destroy":
+            return [permissions.IsAuthenticated(), IsOwner()]
         return super().get_permissions() 
 
-    def get_object(self):
-        obj = super().get_object()
-
-        if self.action in ["destroy"]:
-            if obj.user != self.request.user:
-                raise PermissionDenied
-
-        return obj
-
     def get_queryset(self):
-        repo = self._get_repo_or_403()
-        
-        return Issue.objects.filter(repository=repo).prefetch_related("comments")
+        return Issue.objects.filter(repository=self.kwargs["repository_pk"]).prefetch_related("comments")
 
     def perform_create(self, serializer):
-        repo = self._get_repo_or_403()
-        
+        repo = get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
         serializer.save(user=self.request.user, repository=repo)
 
     def partial_update(self, request, *args, **kwargs):

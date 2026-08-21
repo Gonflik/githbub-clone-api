@@ -289,8 +289,7 @@ def test_collaborator_list_collaborators(db, collaborator, auth_client2, repo):
     col_id = collaborator
     res = auth_client2.get(f'/api/repositories/{repo.data["id"]}/collaborators/')
 
-    assert res.status_code == 200
-    assert len(res.data) == 1
+    assert res.status_code == 403
 
 @pytest.mark.collaborators
 def test_non_owner_list_collaborators(db, collaborator, auth_client3, repo):

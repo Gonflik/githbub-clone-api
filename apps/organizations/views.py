@@ -9,11 +9,8 @@ from apps.invitations.serializers import InvitationSerializer
 from apps.invitations.models import Invitation
 from .models import Organization, OrgMember
 
-class IsOwnerOrReadOnly(permissions.BasePermission):
-      def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-             return True
-        
+class IsOwnerMember(permissions.BasePermission):
+      def has_object_permission(self, request, view, obj):    
         user = OrgMember.objects.get(user=request.user)
 
         return user.role == "OWNER"
@@ -48,7 +45,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 class OrgMemberViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]: #this kinda sucks
-            return [IsMemberOrOwner]
+            return [IsMemberOrOwner()]
         return super().get_permissions()
 
     def get_serializer_class(self):

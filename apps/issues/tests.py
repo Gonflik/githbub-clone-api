@@ -81,7 +81,7 @@ def test_issue_on_private_show_non_authenticated(db, issue_on_private, api_clien
     issue, repo_id = issue_on_private
     res = api_client.get(f'/api/repositories/{repo_id}/issues/{issue.data['id']}/')
 
-    assert res.status_code == 403
+    assert res.status_code == 401
 
 @pytest.mark.issues
 def test_issue_on_private_repo_show_non_author(db, issue_on_private, auth_client2):
