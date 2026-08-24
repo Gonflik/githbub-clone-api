@@ -16,9 +16,6 @@ class IsOwnerOrCollaboratorOrPublic(permissions.BasePermission):
         if repo.visibility == "PUBLIC":
             return True
 
-        if not request.user.is_authenticated:
-            return False
-
         is_owner = repo.user == request.user    
         is_collaborator = repo.collaborators.filter(pk=request.user.pk).exists()
 
@@ -28,16 +25,16 @@ class IsOwnerOrCollaboratorOrPublic(permissions.BasePermission):
 class IssueViewSet(viewsets.ModelViewSet):
     serializer_class = IssueSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-    permission_classes = [IsOwnerOrCollaboratorOrPublic]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
         if self.action in ["retrieve", "list"]:
             return [IsOwnerOrCollaboratorOrPublic()]
-        if self.action in ["create", "partial_update"]:
-            return [permissions.IsAuthenticated(), IsOwnerOrCollaboratorOrPublic()]
+        if self.action == "create":
+            return [IsOwnerOrCollaboratorOrPublic(), permissions.IsAuthenticated()]
         if self.action == "destroy":
             return [permissions.IsAuthenticated(), IsOwner()]
-        return super().get_permissions() 
+        return super().get_permissions()
 
     def get_queryset(self):
         return Issue.objects.filter(repository=self.kwargs["repository_pk"]).prefetch_related("comments")
