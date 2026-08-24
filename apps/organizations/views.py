@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, mixins
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError 
 from django.core.exceptions import PermissionDenied
@@ -10,21 +10,30 @@ from apps.invitations.models import Invitation
 from .models import Organization, OrgMember
 
 class IsOwnerMember(permissions.BasePermission):
-      def has_object_permission(self, request, view, obj):    
-        user = OrgMember.objects.get(user=request.user)
+    def has_permission(self, request, view):
+        org_name = view.kwargs.get("org_name")
+        if not org_name:
+            return True
+
+        org = get_object_or_404(Organization, org_name=org_name)
+        user = OrgMember.objects.get(user=request.user, organization=org)
 
         return user.role == "OWNER"
 
 class IsMemberOrOwner(permissions.BasePermission):
     def has_permission(self, request, view):
-        org = get_object_or_404(Organization, org_name=view.kwargs["org_name"])
-        member = OrgMember.objects.get(user=request.user)
+        org_name = view.kwargs.get("org_name")
+        if not org_name:
+            return True
+
+        org = get_object_or_404(Organization, org_name=org_name)
+        member = OrgMember.objects.get(user=request.user, organization=org)
     
         return member is not None
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     serializer_class = OrganizationSerializer
-    permission_classes = [IsOwnerOrReadOnly]
+    permission_classes = [IsOwnerMember]
 
     lookup_field = "org_name"
 
@@ -42,16 +51,23 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         OrgMember.objects.create(user=user, organization=org, role="OWNER")
 
 
-class OrgMemberViewSet(viewsets.ModelViewSet):
+class OrgMemberViewSet(
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.ListModelMixin,
+    viewsets.GenericViewSet
+):
+    permission_classes = [IsOwnerMember]
+
     def get_permissions(self):
-        if self.action in ["list", "retrieve"]: #this kinda sucks
+        if self.action in ["list", "retrieve"]:
             return [IsMemberOrOwner()]
         return super().get_permissions()
 
     def get_serializer_class(self):
-            if self.action == 'create':
-                return InvitationSerializer
-            return OrgMemberSerializer
+        if self.action == 'create':
+            return InvitationSerializer
+        return OrgMemberSerializer
 
     def get_queryset(self):
         if self.request.user.has_perm('IsMemberOrOwner'):
@@ -85,13 +101,14 @@ class OrgMemberViewSet(viewsets.ModelViewSet):
 
         serializer.save(invitee=invitee, organization=org, invited_by=self.request.user)
 
-    def destroy(self, request, *args, **kwargs):
-        org = get_object_or_404(Organization, org_name=self.kwargs["org_name"])
-        member = get_object_or_404(OrgMember, user=self.request.user)
+    # def destroy(self, request, *args, **kwargs):
+    #     org = get_object_or_404(Organization, org_name=self.kwargs["org_name"])
+    #     member = get_object_or_404(OrgMember, user=self.request.user)
 
-        if member.role != "OWNER":
-            raise PermissionDenied
-        return super().destroy(request, *args, **kwargs)
+    #     if member.role != "OWNER":
+    #         raise PermissionDenied
+        
+    #     return super().destroy(request, *args, **kwargs)
 
     
 
