@@ -6,8 +6,10 @@ from rest_framework.exceptions import ValidationError
 
 from .models import Invitation
 from apps.repositories.models import Collaborator
+from apps.organizations.models import OrgMember
 from .serializers import InvitationSerializer
 from apps.repositories.serializers import CollaboratorSerializer
+from apps.organizations.serializers import OrgMemberSerializer
 
 
 class IsInvitee(permissions.BasePermission):
@@ -20,10 +22,7 @@ class InvitationViewSet(viewsets.GenericViewSet,
                         mixins.ListModelMixin,
     ):
     permission_classes = [IsInvitee]
-    def get_serializer_class(self):
-        if self.action == "list":
-            return InvitationSerializer
-        return CollaboratorSerializer
+    serializer_class = InvitationSerializer
 
     def get_queryset(self):
         return Invitation.objects.filter(invitee=self.request.user)
@@ -39,8 +38,13 @@ class InvitationViewSet(viewsets.GenericViewSet,
         inv.status = "ACCEPTED"
         inv.save()
 
-        collaborator = Collaborator.objects.create(user=user, repository=inv.repository)
-        serializer = CollaboratorSerializer(collaborator)
+        if inv.repository is not None:
+            collaborator = Collaborator.objects.create(user=user, repository=inv.repository)
+            serializer = CollaboratorSerializer(collaborator)
+        else:
+            orgmember = OrgMember.objects.create(user=user, organization=inv.organization)
+            serializer = OrgMemberSerializer(orgmember)
+
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
