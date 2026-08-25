@@ -11,29 +11,31 @@ from .models import Organization, OrgMember
 
 class IsOwnerMember(permissions.BasePermission):
     def has_permission(self, request, view):
-        org_name = view.kwargs.get("org_name")
+        org_name = view.kwargs.get("org_name", view.kwargs.get("org_org_name"))
         if not org_name:
             return True
 
         org = get_object_or_404(Organization, org_name=org_name)
-        user = OrgMember.objects.get(user=request.user, organization=org)
+        try:
+            user = OrgMember.objects.get(user=request.user, organization=org)
+        except OrgMember.DoesNotExist:
+            raise PermissionDenied
 
         return user.role == "OWNER"
 
-class IsMemberOrOwner(permissions.BasePermission):
+class IsMember(permissions.BasePermission):
     def has_permission(self, request, view):
-        org_name = view.kwargs.get("org_name")
+        org_name = view.kwargs.get("org_name", view.kwargs.get("org_org_name"))
         if not org_name:
             return True
 
         org = get_object_or_404(Organization, org_name=org_name)
-        member = OrgMember.objects.get(user=request.user, organization=org)
-    
-        return member is not None
+        return OrgMember.objects.filter(organization=org, user=request.user).exists()
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     serializer_class = OrganizationSerializer
-    permission_classes = [IsOwnerMember]
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    permission_classes = [permissions.IsAuthenticated, IsOwnerMember]
 
     lookup_field = "org_name"
 
@@ -55,13 +57,16 @@ class OrgMemberViewSet(
     mixins.CreateModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
-    permission_classes = [IsOwnerMember]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [IsMemberOrOwner()]
+            return [permissions.IsAuthenticated(), IsMember()]
+        if self.action == "destroy":
+            return [permissions.IsAuthenticated(), IsOwnerMember()]
         return super().get_permissions()
 
     def get_serializer_class(self):
@@ -70,13 +75,15 @@ class OrgMemberViewSet(
         return OrgMemberSerializer
 
     def get_queryset(self):
-        if self.request.user.has_perm('IsMemberOrOwner'):
-            return OrgMember.objects.filter(organization__org_name=self.kwargs["org_name"])
-        return OrgMember.objects.filter(Q(organization__org_name=self.kwargs["org_name"]) & Q(visibility="PUBLIC"))
+        return OrgMember.objects.filter(organization__org_name=self.kwargs["org_org_name"])
 
     def perform_create(self, serializer):
-        org = get_object_or_404(Organization, org_name=self.kwargs["org_name"])
-        member = get_object_or_404(OrgMember, user=self.request.user)
+        org = get_object_or_404(Organization, org_name=self.kwargs["org_org_name"])
+        try:
+            member = OrgMember.objects.get(user=self.request.user, organization=org)
+        except OrgMember.DoesNotExist:
+            raise PermissionDenied
+        
 
         if member.role != "OWNER":
             raise PermissionDenied
@@ -101,15 +108,21 @@ class OrgMemberViewSet(
 
         serializer.save(invitee=invitee, organization=org, invited_by=self.request.user)
 
-    # def destroy(self, request, *args, **kwargs):
-    #     org = get_object_or_404(Organization, org_name=self.kwargs["org_name"])
-    #     member = get_object_or_404(OrgMember, user=self.request.user)
+    def partial_update(self, request, *args, **kwargs):
+        org = get_object_or_404(Organization, org_name=self.kwargs["org_org_name"])
+        try:
+            user = OrgMember.objects.get(user=request.user, organization=org)
+        except OrgMember.DoesNotExist:
+            raise PermissionDenied
 
-    #     if member.role != "OWNER":
-    #         raise PermissionDenied
+        if user.role == "OWNER":
+            pass
+        elif user.role == "MEMBER" and set(request.data.keys()) == {"visibility"}:
+            pass
+        else:
+            raise PermissionDenied
         
-    #     return super().destroy(request, *args, **kwargs)
-
+        return super().partial_update(request, *args, **kwargs)
     
 
 # Create your views here.

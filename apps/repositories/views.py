@@ -16,6 +16,15 @@ from apps.common.permissions import IsOwner
 # Create your views here.
 
 
+# def has_repo_access(user, repo):
+#     # org owner gets implicit access
+#     if repo.organization and repo.organization.members.filter(
+#         user=user, role=OrgMember.Role.OWNER
+#     ).exists():
+#         return True
+    
+#     return Collaborator.objects.filter(repo=repo, user=user).exists()
+
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
@@ -27,6 +36,8 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         if self.action in ["stars", "remove_star"]:
             return [permissions.IsAuthenticated()]
         return super().get_permissions() 
+
+    #this needs updates to handle collaborators, and orgmemebrs. plus creation of a repo via org.
 
     def get_object(self):
         obj = get_object_or_404(Repository, pk=self.kwargs["pk"])

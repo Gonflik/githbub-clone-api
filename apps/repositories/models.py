@@ -64,9 +64,14 @@ class Star(models.Model):
 
 
 class Collaborator(models.Model):
-    #add class permission_level(read, write, admin)
+    class Role(models.TextChoices):
+        READ = "READ", "Read",
+        WRITE = "WRITE", "Write",
+        ADMIN = "ADMIN", "Admin",
+        OWNER = "OWNER", "Owner" 
     user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="collaborations")
     repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="collaborators")
+    role = models.CharField(max_length=5, choices=Role.choices, default=Role.READ)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

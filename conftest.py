@@ -161,4 +161,38 @@ def organization(db, auth_client) -> id:
                                "org_name": "Neworg"
                            })
 
+    return res.data["id"], res.data["org_name"]
+
+@pytest.fixture
+def invite_org_to_user2(db, auth_client, organization, another_user):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/members/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    return res.data["id"]
+
+@pytest.fixture
+def invite_org_to_user3(db, auth_client, organization, another_user2):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/members/',
+                           data={
+                               "invitee": "another2"
+                           })
+
+    return res.data["id"]
+
+@pytest.fixture
+def org_member_user2(db, invite_org_to_user2, auth_client2):
+    inv_id = invite_org_to_user2
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    return res.data["id"]
+
+@pytest.fixture
+def org_member_user3(db, invite_org_to_user3, auth_client3):
+    inv_id = invite_org_to_user3
+    res = auth_client3.post(f'/api/invitations/{inv_id}/accept/')
+
     return res.data["id"]

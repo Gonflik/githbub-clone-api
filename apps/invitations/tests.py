@@ -83,4 +83,11 @@ def test_list_invites_zero(db, auth_client2):
     assert res.status_code == 200
     assert len(res.data) == 0
 
+@pytest.mark.invitations
+def test_accept_invite_from_org(db, invite_org_to_user2, auth_client2):
+    inv_id = invite_org_to_user2
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    assert res.status_code == 200
+
 # Create your tests here.
