@@ -320,7 +320,7 @@ def test_transfer_ownership(db, repo, auth_client, another_user, user):
 
     assert Collaborator.objects.filter(user=user).exists() == True
     assert Repository.objects.get(pk=repo_id).user == another_user
-
+    
 
 @pytest.mark.repositories
 def test_non_owner_transfer_ownership(db, repo, auth_client2):
@@ -336,12 +336,48 @@ def test_transfer_ownership_to_non_exist_user(db, repo, auth_client):
     repo_id = repo.data["id"]
 
     res = auth_client.post(f'/api/repositories/{repo_id}/transfer/',
-                           data={"user": "another"})
+                           data={"user": "anotherblabla"})
 
     assert res.status_code == 404
 
 
 
+@pytest.mark.repositories
+def test_transfer_ownership_to_org(db, repo, auth_client, organization):
+    repo_id = repo.data["id"]
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/transfer/',
+                           data={"organization": "Neworg"})
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_transfer_ownership_to_non_exist_org(db, repo, auth_client):
+    repo_id = repo.data["id"]
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/transfer/',
+                           data={"organization": "Bibiorg"})
+
+    assert res.status_code == 404
+
+@pytest.mark.repositories
+def test_transfer_ownership_to_both(db, repo, auth_client, organization, another_user):
+    repo_id = repo.data["id"]
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/transfer/',
+                           data={"organization": "Neworg",
+                                 "user": "another"})
+
+    assert res.status_code == 400
+
+@pytest.mark.repositories
+def test_transfer_ownership_empty_json(db, repo, auth_client, organization, another_user):
+    repo_id = repo.data["id"]
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/transfer/',
+                           data={})
+
+    assert res.status_code == 400
 
     
 # Create your tests here.

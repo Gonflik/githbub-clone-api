@@ -72,16 +72,30 @@ class RepositoryViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=["post"])
     def transfer(self, request, pk=None):
+        from apps.organizations.models import Organization
         repo = self.get_object()
         user = request.user 
 
-        new_owner = get_object_or_404(CustomUser, username=request.data["user"])
+        if request.data.get("user") and request.data.get("organization"):
+            raise ValidationError("You can only transfer to either org or an user!")
+
+        if not request.data.get("user") and not request.data.get("organization"):
+            raise ValidationError("'user' or 'organization' have to be passed!")
+
+        if request.data.get("user"):
+            new_owner = get_object_or_404(CustomUser, username=request.data["user"])
+            repo.user = new_owner
+            repo.organization = None
+        if request.data.get("organization"):
+            new_owner = get_object_or_404(Organization, org_name=request.data["organization"])
+            repo.organization = new_owner
+            repo.user = None
+
+        repo.save()
 
         Collaborator.objects.create(user=user, repository=repo)
-
-        repo.user = new_owner
-        repo.save()
-        return Response({"detail": f"Ownership succesfully transferred to '{new_owner.username}'"}, status=status.HTTP_200_OK)
+        
+        return Response({"detail": f"Ownership succesfully transferred to '{new_owner.org_name if isinstance(new_owner, Organization) else new_owner.username}'"}, status=status.HTTP_200_OK)
 
 
 
