@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from rest_framework import viewsets, permissions, mixins
+from rest_framework import viewsets, permissions, mixins, status
 from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError 
 from django.core.exceptions import PermissionDenied
@@ -8,6 +8,8 @@ from .serializers import OrganizationSerializer, OrgMemberSerializer
 from apps.invitations.serializers import InvitationSerializer
 from apps.invitations.models import Invitation
 from .models import Organization, OrgMember
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 class IsOwnerMember(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -44,6 +46,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "retrieve":
             return [AllowAny()]
+        if self.action == "leave":
+            return [permissions.IsAuthenticated(), IsMember()]
         return super().get_permissions()
 
     def perform_create(self, serializer):
@@ -51,6 +55,16 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         org = serializer.save(created_by=user)
 
         OrgMember.objects.create(user=user, organization=org, role="OWNER")
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, org_name=None):
+        org = self.get_object()
+        member = get_object_or_404(OrgMember, user=request.user, organization=org)
+        if OrgMember.objects.filter(role="OWNER").count() == 1 and member.role == "OWNER":
+            return Response({"detail": "Can't leave. Atleast 1 owner needs to exist in an organization!"}, status=status.HTTP_403_FORBIDDEN)
+        
+        member.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class OrgMemberViewSet(

@@ -258,11 +258,33 @@ def test_delete_member_non_auth(db, org_member_user2, api_client, organization):
     assert res.status_code == 401
 
 
+@pytest.mark.organizations
+def test_leave_org(db, organization, org_member_user2, auth_client2):
+    org_id, org_name = organization
+    res = auth_client2.post(f'/api/organizations/{org_name}/leave/')
 
+    assert res.status_code == 204
 
+@pytest.mark.organizations
+def test_last_owner_leave_org(db, organization, auth_client):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/leave/')
 
+    assert res.status_code == 403
 
+@pytest.mark.organizations
+def test_non_member_leave_org(db, organization, auth_client2):
+    org_id, org_name = organization
+    res = auth_client2.post(f'/api/organizations/{org_name}/leave/')
 
+    assert res.status_code == 403
+
+@pytest.mark.organizations
+def test_non_auth_leave_org(db, organization, api_client):
+    org_id, org_name = organization
+    res = api_client.post(f'/api/organizations/{org_name}/leave/')
+
+    assert res.status_code == 401
 
 
 
