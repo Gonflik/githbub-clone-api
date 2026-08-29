@@ -33,7 +33,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             return [AllowAny()]
-        if self.action in ["stars", "remove_star"]:
+        if self.action in ["stars", "remove_star", "create"]:
             return [permissions.IsAuthenticated()]
         return super().get_permissions() 
 
@@ -51,9 +51,12 @@ class RepositoryViewSet(viewsets.ModelViewSet):
           if user.is_authenticated:
                 return Repository.objects.filter(Q(user=user) | Q(visibility=Repository.Status.PUBLIC))
           return Repository.objects.filter(visibility=Repository.Status.PUBLIC)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
     
     @action(detail=True, methods=["post"])
-    def stars(self, request, pk=None):
+    def stars(self, request, pk=None, **kwargs):
         repo = self.get_object()
         user = request.user
         if Star.objects.filter(user=user, repository=repo).exists():
@@ -62,7 +65,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_201_CREATED)
 
     @stars.mapping.delete
-    def remove_star(self, request, pk=None):
+    def remove_star(self, request, pk=None, **kwargs):
         repo = self.get_object()
         user = request.user
         if not Star.objects.filter(user=user, repository=repo).exists():
@@ -71,7 +74,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_200_OK)
     
     @action(detail=True, methods=["post"])
-    def transfer(self, request, pk=None):
+    def transfer(self, request, pk=None, **kwargs):
         from apps.organizations.models import Organization
         repo = self.get_object()
         user = request.user 
@@ -150,4 +153,34 @@ class CollaboratorViewSet(
         serializer.save(invitee=invitee, repository=repo, invited_by=self.request.user)
 
     
+class OrgRepositoryViewSet(RepositoryViewSet):
+    from apps.organizations.views import IsOwnerMember
+    from apps.organizations.models import Organization, OrgMember
+    serializer_class = RepositorySerializer
+    http_method_names = ['get', 'post']
 
+    def get_permissions(self):
+        if self.action in ["create", "transfer"]:
+            return [permissions.IsAuthenticated(), self.IsOwnerMember()]
+        if self.action in ["star", "remove_star"]:
+            return [permissions.IsAuthenticated()]
+        if self.action == "list":
+            return [permissions.AllowAny()]
+        return super().get_permissions()
+
+    def get_queryset(self):
+        org = get_object_or_404(self.Organization, org_name=self.kwargs["org_org_name"])
+        if self.request.user.is_authenticated:
+            membership = self.OrgMember.objects.filter(user=self.request.user, organization=org).first()
+            if membership:
+                if membership.role == "OWNER":
+                    return Repository.objects.filter(organization=org)
+                return Repository.objects.filter(Q(visibility="PUBLIC") | Q(collaborators__user=self.request.user), organization=org)
+        return Repository.objects.filter(organization=org, visibility="PUBLIC")
+
+    def retrieve(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def perform_create(self, serializer):
+        org = get_object_or_404(self.Organization, org_name=self.kwargs["org_org_name"])
+        serializer.save(organization=org)

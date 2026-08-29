@@ -196,3 +196,23 @@ def org_member_user3(db, invite_org_to_user3, auth_client3):
     res = auth_client3.post(f'/api/invitations/{inv_id}/accept/')
 
     return res.data["id"]
+
+@pytest.fixture
+def org_repo(db, auth_client, organization):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "Orgrepo"
+                           })
+    return res.data['id']
+
+@pytest.fixture
+def org_repo_private(db, auth_client, organization):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "OrgrepoPrivate",
+                               "visibility": "PRIVATE",
+                           })
+    return res.data['id']
+

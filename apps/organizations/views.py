@@ -137,6 +137,6 @@ class OrgMemberViewSet(
             raise PermissionDenied
         
         return super().partial_update(request, *args, **kwargs)
-    
+
 
 # Create your views here.

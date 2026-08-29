@@ -379,5 +379,131 @@ def test_transfer_ownership_empty_json(db, repo, auth_client, organization, anot
 
     assert res.status_code == 400
 
+@pytest.mark.repositories
+def test_owner_create_org_repo(db, auth_client, organization):
+    org_id, org_name = organization
+    res = auth_client.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "Organization Repo"
+                           })
+
+    assert res.status_code == 201
+    assert res.data["owner"]["name"] == "Neworg"
+
+@pytest.mark.repositories
+def test_non_owner_create_org_repo(db, auth_client2, organization):
+    org_id, org_name = organization
+    res = auth_client2.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "Organization Repo"
+                           })
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_non_auth_create_org_repo(db, api_client, organization):
+    org_id, org_name = organization
+    res = api_client.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "Organization Repo"
+                           })
+
+    assert res.status_code == 401
+
+@pytest.mark.repositories
+def test_member_create_org_repo(db, auth_client2, organization, org_member_user2):
+    org_id, org_name = organization
+    res = auth_client2.post(f'/api/organizations/{org_name}/repositories/',
+                           data={
+                               "name": "Organization Repo"
+                           })
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_owner_list_org_repo(db, organization, auth_client, org_repo, org_repo_private):
+    org_id, org_name = organization
+    res = auth_client.get(f'/api/organizations/{org_name}/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 2
+
+@pytest.mark.repositories
+def test_non_auth_list_org_repo(db, organization, api_client, org_repo, org_repo_private):
+    org_id, org_name = organization
+    res = api_client.get(f'/api/organizations/{org_name}/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+@pytest.mark.repositories
+def test_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo_private, org_member_user2):
+    org_id, org_name = organization
+    res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1 #its 1 rn cause, there's no permissions for members, unless they're collaborators
+
+@pytest.mark.repositories
+def test_non_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo_private):
+    org_id, org_name = organization
+    res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+@pytest.mark.repositories
+def test_retrieve_org_repo(db, organization, org_repo, auth_client):
+    org_id, org_name = organization
+    repo_id = org_repo
+
+    res = auth_client.get(f'/api/organizations/{org_name}/repositories/{repo_id}/')
+
+    assert res.status_code == 405
+
+@pytest.mark.repositories
+def test_transfer_ownership_of_org_repo_to_user(db, organization, org_repo, auth_client, another_user):
+    org_id, org_name = organization
+    repo_id = org_repo
+
+    res = auth_client.post(f'/api/organizations/{org_name}/repositories/{repo_id}/transfer/',
+                           data={"user": "another"})
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_non_owner_ransfer_ownership_of_org_repo_to_user(db, organization, org_repo, auth_client3, another_user):
+    org_id, org_name = organization
+    repo_id = org_repo
+
+    res = auth_client3.post(f'/api/organizations/{org_name}/repositories/{repo_id}/transfer/',
+                           data={"user": "another"})
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_non_auth_ransfer_ownership_of_org_repo_to_user(db, organization, org_repo, api_client, another_user):
+    org_id, org_name = organization
+    repo_id = org_repo
+
+    res = api_client.post(f'/api/organizations/{org_name}/repositories/{repo_id}/transfer/',
+                           data={"user": "another"})
+
+    assert res.status_code == 401
+
+@pytest.mark.repositories
+def test_member_ransfer_ownership_of_org_repo_to_user(db, organization, org_repo, org_member_user3, auth_client3, another_user):
+    org_id, org_name = organization
+    repo_id = org_repo
+
+    res = auth_client3.post(f'/api/organizations/{org_name}/repositories/{repo_id}/transfer/',
+                           data={"user": "another"})
+
+    assert res.status_code == 403
+
+
+
+
+
     
 # Create your tests here.

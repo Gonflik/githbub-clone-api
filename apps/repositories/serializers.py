@@ -3,23 +3,24 @@ from .models import Repository, Star, Collaborator
 
 
 class RepositorySerializer(serializers.ModelSerializer):
-
     stars_count = serializers.SerializerMethodField()
+    owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Repository
-        fields = ["id" ,"name", "description", "visibility" ,"stars_count","created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-    def create(self, validated_data):
-        user = self.context["request"].user
-        return Repository.objects.create(user=user, **validated_data)
+        fields = ["id" ,"name", "description", "owner", "visibility" ,"stars_count", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "owner", "stars_count"]
 
     def validate_name(self, value):
         user = self.context["request"].user
         if Repository.objects.filter(user=user, name=value).exists():
             raise serializers.ValidationError("You already have a repository with this name.")
         return value
+
+    def get_owner(self, obj):
+        if obj.user:
+            return {"type": "user", "name": obj.user.username}
+        return {"type": "organization", "name": obj.organization.org_name}
 
     def get_stars_count(self, obj):
         return Star.objects.filter(repository=obj).count()
