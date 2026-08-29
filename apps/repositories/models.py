@@ -7,7 +7,7 @@ class Repository(models.Model):
         PUBLIC = "PUBLIC", "Public"
 
     name = models.CharField(max_length=100)
-    description = models.TextField()
+    description = models.TextField(null=True)
     visibility = models.CharField(max_length=7, choices=Status.choices, default=Status.PUBLIC)
     
     open_issues_count = None
