@@ -14,6 +14,7 @@ class Repository(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
 
     user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="repositories", null=True)
     organization = models.ForeignKey("organizations.Organization", on_delete=models.CASCADE, related_name="repositories", null=True)
