@@ -155,6 +155,20 @@ def collaborator(db, auth_client2, invite_user_to_user2) -> id:
     return (res.data["id"], inv_id)
 
 @pytest.fixture
+def collaborator_private_repo(db, private_repo, auth_client, auth_client2):
+    repo_id = private_repo.data["id"]
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    inv_id = res.data["id"]
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    return res.data["id"]
+
+@pytest.fixture
 def organization(db, auth_client) -> id:
     res = auth_client.post('/api/organizations/',
                            data={
@@ -216,3 +230,52 @@ def org_repo_private(db, auth_client, organization):
                            })
     return res.data['id']
 
+@pytest.fixture
+def collaborator_org_repo(db, org_repo, auth_client, auth_client2):
+    repo_id = org_repo
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    inv_id = res.data["id"]
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    return res.data["id"]
+
+@pytest.fixture
+def collaborator_private_org_repo(db, org_repo_private, auth_client, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client.post(f'/api/repositories/{repo_id}/collaborators/',
+                           data={
+                               "invitee": "another"
+                           })
+
+    inv_id = res.data["id"]
+
+    res = auth_client2.post(f'/api/invitations/{inv_id}/accept/')
+
+    return res.data["id"]
+
+@pytest.fixture
+def collaborator_private_org_repo_write(db, collaborator_private_org_repo, org_repo_private, auth_client):
+    col_id = collaborator_private_org_repo
+    repo_id = org_repo_private
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "WRITE"
+                            })
+
+    return res.data["id"]
+
+@pytest.fixture
+def collaborator_private_org_repo_admin(db, collaborator_private_org_repo, org_repo_private, auth_client):
+    col_id = collaborator_private_org_repo
+    repo_id = org_repo_private
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "ADMIN"
+                            })
+
+    return res.data["id"]

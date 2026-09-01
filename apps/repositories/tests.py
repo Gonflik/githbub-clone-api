@@ -71,9 +71,9 @@ def test_repo_show_non_authenticated(db, api_client, repo):
     assert res.status_code == 200
 
 @pytest.mark.repositories
-def test_private_repo_show_non_author(db, private_repo, api_client):
+def test_private_repo_show_non_author(db, private_repo, auth_client2):
     repo_id = private_repo.data["id"]
-    res = api_client.get(f'/api/repositories/{repo_id}/')
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
 
     assert res.status_code == 403
 
@@ -442,7 +442,7 @@ def test_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo
     res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1 #its 1 rn cause, there's no permissions for members, unless they're collaborators
+    assert len(res.data) == 1
 
 @pytest.mark.repositories
 def test_non_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo_private):
@@ -501,7 +501,303 @@ def test_member_ransfer_ownership_of_org_repo_to_user(db, organization, org_repo
 
     assert res.status_code == 403
 
+@pytest.mark.repositories
+def test_update_collaborator_role(db, repo, auth_client, collaborator):
+    col_id, inv_id = collaborator
 
+    repo_id = repo.data['id']
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "WRITE",
+                            })
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_update_collaborator_role_failure(db, repo, auth_client, collaborator):
+    col_id, inv_id = collaborator
+
+    repo_id = repo.data['id']
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "OWNER",
+                            })
+
+    assert res.status_code == 400
+
+@pytest.mark.repositories
+def test_update_collaborator_role_failure2(db, repo, auth_client, collaborator):
+    col_id, inv_id = collaborator
+
+    repo_id = repo.data['id']
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "READ",
+                            })
+
+    assert res.status_code == 400
+
+@pytest.mark.repositories
+def test_update_collaborator_org_repo(db, org_repo, collaborator_org_repo, auth_client):
+    repo_id = org_repo
+    col_id = collaborator_org_repo
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "READ",
+                            })
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_update_collaborator_org_repo_2(db, org_repo, collaborator_org_repo, auth_client):
+    repo_id = org_repo
+    col_id = collaborator_org_repo
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "ADMIN",
+                            })
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_update_collaborator_org_repo_failure(db, org_repo, collaborator_org_repo, auth_client):
+    repo_id = org_repo
+    col_id = collaborator_org_repo
+
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "OWNER",
+                            })
+
+    assert res.status_code == 400
+
+@pytest.mark.repositories
+def test_non_owner_update_collaborator_org_repo(db, org_repo, collaborator_org_repo, auth_client3):
+    repo_id = org_repo
+    col_id = collaborator_org_repo
+
+    res = auth_client3.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "ADMIN",
+                            })
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_non_auth_update_collaborator_org_repo(db, org_repo, collaborator_org_repo, api_client):
+    repo_id = org_repo
+    col_id = collaborator_org_repo
+
+    res = api_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "ADMIN",
+                            })
+
+    assert res.status_code == 401
+
+@pytest.mark.repositories
+def test_collaborator_show_repo(db, collaborator, repo, auth_client2):
+    repo_id = repo.data["id"]
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_collaborator_read_show_private_org_repo(db, org_repo_private, collaborator_private_org_repo, auth_client2):
+    repo_id = org_repo_private
+    col_id = collaborator_private_org_repo
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_collaborator_write_show_private_org_repo(db, org_repo_private, collaborator_private_org_repo_write, auth_client2):
+    repo_id = org_repo_private
+    col_id = collaborator_private_org_repo_write
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_collaborator_admin_show_private_org_repo(db, org_repo_private, collaborator_private_org_repo_admin, auth_client2):
+    repo_id = org_repo_private
+    col_id = collaborator_private_org_repo_admin
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 200
+    print(res.data)
+
+@pytest.mark.repositories
+def test_non_collaborator_show_private_org_repo(db, org_repo_private, auth_client3):
+    repo_id = org_repo_private
+
+    res = auth_client3.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_org_member_non_collaborator_show_private_org_repo(db, org_repo_private, org_member_user2, auth_client2):
+    repo_id = org_repo_private
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_random_guy_show_public_org_repo(db, org_repo, auth_client2):
+    repo_id = org_repo
+
+    res = auth_client2.get(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_collaborator_update_repo_description(db, repo, collaborator, auth_client2):
+    repo_id = repo.data["id"]
+
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/',
+                             data={
+                                 "description": "newdesc"
+                             })
+
+    assert res.status_code == 200
+    assert res.data["description"] == "newdesc"
+
+@pytest.mark.repositories
+def test_collaborator_update_repo_visibility(db, repo, collaborator, auth_client2):
+    repo_id = repo.data["id"]
+
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/',
+                             data={
+                                 "visibility": "PRIVATE"
+                             })
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_read_patch_org_repo(db, org_repo_private, collaborator_private_org_repo, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/',
+                             data={"description": "newdesc"})
+    
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_write_patch_org_repo_description(db, org_repo_private, collaborator_private_org_repo_write, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/',
+                             data={"description": "newdesc"})
+    
+    assert res.status_code == 200
+
+@pytest.mark.repositories
+def test_collaborator_write_patch_org_repo_visibility(db, org_repo_private, collaborator_private_org_repo_write, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.patch(f'/api/repositories/{repo_id}/',
+                             data={"visibility": "PUBLIC"})
+    
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_delete_personal_repo(db, repo, collaborator, auth_client2):
+    repo_id = repo.data["id"]
+    res = auth_client2.delete(f'/api/repositories/{repo_id}/')
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_transfer_personal_repo(db, repo, collaborator, auth_client2, another_user):
+    repo_id = repo.data["id"]
+    res = auth_client2.post(f'/api/repositories/{repo_id}/transfer/',
+                            data={"user": "another"})
+    
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_star_private_repo(db, private_repo, collaborator_private_repo, auth_client2):
+    repo_id = private_repo.data["id"]
+    res = auth_client2.post(f'/api/repositories/{repo_id}/stars/')
+
+    assert res.status_code == 201
+
+@pytest.mark.repositories
+def test_non_collaborator_star_private_org_repo(db, org_repo_private, auth_client3):
+    repo_id = org_repo_private
+    res = auth_client3.post(f'/api/repositories/{repo_id}/stars/')
+
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_collaborator_read_star_private_org_repo(db, org_repo_private, collaborator_private_org_repo, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.post(f'/api/repositories/{repo_id}/stars/')
+
+    assert res.status_code == 201
+
+@pytest.mark.collaborators
+def test_admin_collaborator_invite(db, org_repo_private, collaborator_private_org_repo_admin, auth_client2, another_user):
+    repo_id = org_repo_private
+    res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={"invitee": "another"})
+    
+    assert res.status_code == 201
+
+@pytest.mark.collaborators
+def test_admin_collaborator_remove(db, org_repo_private, collaborator_private_org_repo_admin, collaborator_org_repo, auth_client2):
+    repo_id = org_repo_private
+    col_id = collaborator_org_repo
+    res = auth_client2.delete(f'/api/repositories/{repo_id}/collaborators/{col_id}/')
+
+    assert res.status_code == 204
+
+@pytest.mark.collaborators
+def test_write_collaborator_cannot_manage(db, org_repo_private, collaborator_private_org_repo_write, another_user, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={"invitee": "another"})
+    
+    assert res.status_code == 403
+
+@pytest.mark.collaborators
+def test_read_collaborator_cannot_manage(db, org_repo_private, collaborator_private_org_repo, another_user, auth_client2):
+    repo_id = org_repo_private
+    res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={"invitee": "another"})
+    
+    assert res.status_code == 403
+
+@pytest.mark.repositories
+def test_patch_org_repo_endpoint(db, organization, org_repo, auth_client):
+    org_id, org_name = organization
+    res = auth_client.patch(f'/api/organizations/{org_name}/repositories/{org_repo}/',
+                            data={"description": "new"})
+    
+    assert res.status_code == 405
+
+@pytest.mark.repositories
+def test_delete_org_repo_endpoint(db, organization, org_repo, auth_client):
+    org_id, org_name = organization
+    res = auth_client.delete(f'/api/organizations/{org_name}/repositories/{org_repo}/')
+
+    assert res.status_code == 405
+
+@pytest.mark.repositories
+def test_collaborator_sees_private_org_repo_in_list(db, organization, org_repo_private, collaborator_private_org_repo, auth_client2):
+    org_id, org_name = organization
+    res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+    
 
 
 
