@@ -744,18 +744,24 @@ def test_collaborator_read_star_private_org_repo(db, org_repo_private, collabora
     assert res.status_code == 201
 
 @pytest.mark.collaborators
-def test_admin_collaborator_invite(db, org_repo_private, collaborator_private_org_repo_admin, auth_client2, another_user):
-    repo_id = org_repo_private
+def test_admin_collaborator_invite(db, org_repo, collaborator_org_repo_admin, auth_client2, another_user2):
+    repo_id = org_repo
     res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
-                            data={"invitee": "another"})
+                            data={"invitee": "another2"})
     
     assert res.status_code == 201
 
 @pytest.mark.collaborators
-def test_admin_collaborator_remove(db, org_repo_private, collaborator_private_org_repo_admin, collaborator_org_repo, auth_client2):
-    repo_id = org_repo_private
-    col_id = collaborator_org_repo
-    res = auth_client2.delete(f'/api/repositories/{repo_id}/collaborators/{col_id}/')
+def test_admin_collaborator_remove(db, org_repo, collaborator_org_repo_admin, auth_client2, auth_client3, another_user2):
+    repo_id = org_repo
+    
+    res = auth_client2.post(f'/api/repositories/{repo_id}/collaborators/',
+                            data={"invitee": "another2"})
+    
+    inv_id = res.data["id"]
+    col = auth_client3.post(f'/api/invitations/{inv_id}/accept/')
+    
+    res = auth_client2.delete(f'/api/repositories/{repo_id}/collaborators/{col.data['id']}/')
 
     assert res.status_code == 204
 

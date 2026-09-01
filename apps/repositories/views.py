@@ -173,8 +173,6 @@ class IsRepositoryOwner(permissions.BasePermission):
             try:
                 member = OrgMember.objects.get(user=request.user, organization=repo.organization)
             except OrgMember.DoesNotExist:
-                raise PermissionDenied
-            else:
                 try:
                     collab = Collaborator.objects.get(user=request.user, repository=repo)
                 except Collaborator.DoesNotExist:
@@ -182,7 +180,8 @@ class IsRepositoryOwner(permissions.BasePermission):
                 else:
                     if collab.role == "ADMIN":
                         return True
-            return member.role == "OWNER"
+            else:
+                return member.role == "OWNER"
 
         return repo.user == user
 

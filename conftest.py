@@ -279,3 +279,13 @@ def collaborator_private_org_repo_admin(db, collaborator_private_org_repo, org_r
                             })
 
     return res.data["id"]
+
+@pytest.fixture
+def collaborator_org_repo_admin(db, collaborator_org_repo, org_repo, auth_client):
+    col_id = collaborator_org_repo
+    repo_id = org_repo
+    res = auth_client.patch(f'/api/repositories/{repo_id}/collaborators/{col_id}/',
+                            data={
+                                "role": "ADMIN"
+                            })
+    return res.data["id"]
