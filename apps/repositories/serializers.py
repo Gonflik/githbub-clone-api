@@ -43,7 +43,7 @@ class CollaboratorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collaborator
         fields = ["id", "role", "user", "repository", "created_at"]
-        read_only_fields = ["id", "role", "user", "repository" "created_at"]
+        read_only_fields = ["id", "user", "repository", "created_at"]
 
     def validate_role(self, value):
         repo = self.context["repository"]
