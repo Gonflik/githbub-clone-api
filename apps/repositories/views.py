@@ -7,54 +7,112 @@ from rest_framework.response import Response
 from .serializers import RepositorySerializer, StarSerializer, CollaboratorSerializer
 from apps.invitations.serializers import InvitationSerializer
 from rest_framework.permissions import AllowAny
-from rest_framework.exceptions import ValidationError 
+from rest_framework.exceptions import ValidationError, NotAuthenticated 
 from .models import Repository, Star, Collaborator
 from apps.invitations.models import Invitation
 from apps.accounts.models import CustomUser
-from apps.common.permissions import IsOwner
-
+from apps.organizations.models import OrgMember
 # Create your views here.
 
 
-# def has_repo_access(user, repo):
-#     # org owner gets implicit access
-#     if repo.organization and repo.organization.members.filter(
-#         user=user, role=OrgMember.Role.OWNER
-#     ).exists():
-#         return True
-    
-#     return Collaborator.objects.filter(repo=repo, user=user).exists()
+
+
+class IsOwnerOrOrgStuff(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            if obj.visibility == "PUBLIC" and view.action == "retrieve":
+                return True
+            raise NotAuthenticated
+
+        if obj.organization is not None:
+            try:
+                member = OrgMember.objects.get(user=request.user, organization=obj.organization)
+            except OrgMember.DoesNotExist:
+                try:
+                    collab_guy = Collaborator.objects.get(user=request.user, repository=obj)
+                except Collaborator.DoesNotExist:
+                    if obj.visibility == "PUBLIC" and view.action in ["retrieve", "stars", "remove_star"]:
+                        return True
+                    raise PermissionDenied
+                else:
+                    if collab_guy.role == "ADMIN":
+                        if view.action in ["retrieve", "partial_update", "stars", "remove_star"]:
+                            return True
+                        return False
+                    if collab_guy.role == "WRITE":
+                        if view.action in ["retrieve", "partial_update", "stars", "remove_star"]:
+                            return True
+                        return False
+                    if collab_guy.role == "READ":
+                        if view.action in ["retrieve", "stars", "remove_star"]:
+                            return True
+                        return False 
+            else:
+                return member.role == "OWNER"
+        else:
+            if obj.user == request.user:
+                return True
+            try:
+                collab_guy = Collaborator.objects.get(user=request.user, repository=obj)
+            except Collaborator.DoesNotExist:
+                if obj.visibility == "PUBLIC" and view.action in ["retrieve", "stars", "remove_star"]:
+                    return True
+                raise PermissionDenied
+            else:
+                if view.action in ["retrieve", "partial_update", "stars", "remove_star"]:
+                    return True
+                raise PermissionDenied
+
 
 class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrOrgStuff]
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve"]:
+        if self.action == "list":
             return [AllowAny()]
-        if self.action in ["stars", "remove_star", "create"]:
+        if self.action == "create":
             return [permissions.IsAuthenticated()]
         return super().get_permissions() 
 
-    #this needs updates to handle collaborators, and orgmemebrs. plus creation of a repo via org.
-
     def get_object(self):
         obj = get_object_or_404(Repository, pk=self.kwargs["pk"])
-        if obj.visibility == Repository.Status.PRIVATE and obj.user != self.request.user:
-            raise PermissionDenied
         self.check_object_permissions(self.request, obj)
         return obj 
 
     def get_queryset(self):
           user = self.request.user
           if user.is_authenticated:
-                return Repository.objects.filter(Q(user=user) | Q(visibility=Repository.Status.PUBLIC))
+                return Repository.objects.filter(Q(user=user) | Q(visibility=Repository.Status.PUBLIC) | Q(collaborators__user=self.request.user))
           return Repository.objects.filter(visibility=Repository.Status.PUBLIC)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
-    
+
+    def perform_update(self, serializer):
+        repo = self.get_object()
+        user = self.request.user
+
+        if repo.organization is None and repo.user != user:
+            allowed = {"description"}
+            for field in list(serializer.validated_data.keys()):
+                if field not in allowed:
+                    raise PermissionDenied
+
+        if repo.organization is not None:
+            try:
+                collab = Collaborator.objects.get(user=user, repository=repo)
+            except Collaborator.DoesNotExist:
+                pass
+            else:
+                allowed = {"description"} if collab.role == "WRITE" else set()
+                for field in list(serializer.validated_data.keys()):
+                    if field not in allowed:
+                        raise PermissionDenied
+
+        serializer.save()
+
     @action(detail=True, methods=["post"])
     def stars(self, request, pk=None, **kwargs):
         repo = self.get_object()
@@ -104,11 +162,27 @@ class RepositoryViewSet(viewsets.ModelViewSet):
 
 class IsRepositoryOwner(permissions.BasePermission):
     def has_permission(self, request, view):
+        from apps.organizations.models import OrgMember
         repo = get_object_or_404(Repository, pk=view.kwargs["repository_pk"])
         user = request.user
         
         if not user.is_authenticated:
             return False
+
+        if repo.organization is not None:
+            try:
+                member = OrgMember.objects.get(user=request.user, organization=repo.organization)
+            except OrgMember.DoesNotExist:
+                raise PermissionDenied
+            else:
+                try:
+                    collab = Collaborator.objects.get(user=request.user, repository=repo)
+                except Collaborator.DoesNotExist:
+                    pass
+                else:
+                    if collab.role == "ADMIN":
+                        return True
+            return member.role == "OWNER"
 
         return repo.user == user
 
@@ -116,21 +190,33 @@ class CollaboratorViewSet(
     mixins.CreateModelMixin,
     mixins.DestroyModelMixin,
     mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet
 ):
     permission_classes = [IsRepositoryOwner]
-    
+    http_method_names = ["get", "post", "patch", "delete"]
+
+    def get_repo(self):
+        if not hasattr(self, "_repo"):
+            self._repo = get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
+        return self._repo
+
     def get_serializer_class(self):
         if self.action == 'create':
             return InvitationSerializer
         return CollaboratorSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["repository"] = self.get_repo()
+        return context
+
     def get_queryset(self):
-        return Collaborator.objects.filter(repository__pk=self.kwargs["repository_pk"])
+        return Collaborator.objects.filter(repository_id=self.kwargs["repository_pk"])
     
 
     def perform_create(self, serializer):
-        repo =  get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
+        repo =  self.get_repo()
 
         invitee = serializer.validated_data["invitee"]
        
@@ -151,7 +237,6 @@ class CollaboratorViewSet(
             
 
         serializer.save(invitee=invitee, repository=repo, invited_by=self.request.user)
-
     
 class OrgRepositoryViewSet(RepositoryViewSet):
     from apps.organizations.views import IsOwnerMember
@@ -172,10 +257,9 @@ class OrgRepositoryViewSet(RepositoryViewSet):
         org = get_object_or_404(self.Organization, org_name=self.kwargs["org_org_name"])
         if self.request.user.is_authenticated:
             membership = self.OrgMember.objects.filter(user=self.request.user, organization=org).first()
-            if membership:
-                if membership.role == "OWNER":
-                    return Repository.objects.filter(organization=org)
-                return Repository.objects.filter(Q(visibility="PUBLIC") | Q(collaborators__user=self.request.user), organization=org)
+            if membership and membership.role == "OWNER":
+                return Repository.objects.filter(organization=org)
+            return Repository.objects.filter(Q(visibility="PUBLIC") | Q(collaborators__user=self.request.user), organization=org)
         return Repository.objects.filter(organization=org, visibility="PUBLIC")
 
     def retrieve(self, request, *args, **kwargs):
