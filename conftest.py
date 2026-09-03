@@ -88,7 +88,7 @@ def issue2(repo, auth_client):
     res = auth_client.post(f'/api/repositories/{repo_id}/issues/',
                            data={
                                "title": "someissue",
-                               "description": "issue on public repo",
+                               "description": "issue on public repo2",
                            })
     return (res, repo_id)
 
@@ -109,10 +109,23 @@ def issue_on_private(private_repo, auth_client):
 
     res = auth_client.post(f'/api/repositories/{repo_id}/issues/',
                            data={
-                               "title": "someissue",
-                               "description": "issue on public repo",
+                               "title": "privateissue",
+                               "description": "issue on private repo",
                            })
     return (res, repo_id)
+
+@pytest.fixture
+def issue_on_private_org_repo(org_repo_private, auth_client):
+    repo_id = org_repo_private
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/',
+                           data={
+                               "title": "orgprivate",
+                               "description": "sigma"
+                           })
+
+    return (res, repo_id)
+
 
 @pytest.fixture
 def issue_user2(repo, auth_client2):
