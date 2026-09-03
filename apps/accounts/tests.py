@@ -124,4 +124,43 @@ def test_user_logout_invalid_token(db, api_client, user):
     assert res.status_code == 401
 
 
+@pytest.mark.accounts
+def test_get_user_repositories(db, auth_client, repo, repo2, private_repo):
+    res = auth_client.get(f'/api/users/testuser/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 3
+
+@pytest.mark.accounts
+def test_get_user_repositories_search(db, auth_client, repo, repo2, private_repo):
+    res = auth_client.get(f'/api/users/testuser/repositories/?q=private')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+@pytest.mark.accounts
+def test_get_user_repositories_non_owner(db, auth_client2, repo, repo2, private_repo):
+    res = auth_client2.get(f'/api/users/testuser/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 2
+
+@pytest.mark.accounts
+def test_get_user_repositories_collaborator(db, auth_client2, repo, repo2, private_repo, collaborator_private_repo):
+    res = auth_client2.get(f'/api/users/testuser/repositories/')
+
+    assert res.status_code == 200
+    assert len(res.data) == 3
+
+@pytest.mark.accounts
+def test_search_users_non_auth(db, another_user, another_user2, api_client):
+    res = api_client.get('/api/users/?q=another')
+
+    assert res.status_code == 200
+    print(res.data)
+
+    assert len(res.data) == 2
+
+
+
 # Create your tests here.

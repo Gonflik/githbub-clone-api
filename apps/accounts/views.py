@@ -1,12 +1,14 @@
 from django.shortcuts import render
-from rest_framework import routers, viewsets, status
+from rest_framework import routers, viewsets, status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.db.models import Q
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework.exceptions import ValidationError
 from .serializers import RegisterSerializer, UserSerializer, LoginSerializer
 from .models import CustomUser
 
@@ -77,4 +79,47 @@ class LogoutView(APIView):
             return Response({"message": "Logged out!"},status=status.HTTP_200_OK)
         except TokenError:
             return Response({"detail": "Invalid token!"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RepositoryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, username=None):
+        from apps.repositories.serializers import RepositorySerializer
+        from apps.repositories.models import Repository
+        user = get_object_or_404(CustomUser, username=username)
+
+        if user != self.request.user:
+            queryset = Repository.objects.filter(
+                Q(user=user) & (Q(visibility=Repository.Status.PUBLIC) | Q(collaborators__user=self.request.user))
+            ).distinct()
+        else:
+            queryset = Repository.objects.filter(user=user)
+
+        search_param = request.query_params.get('q')
+        if search_param:
+            queryset = queryset.filter(
+                Q(name__icontains=search_param) |
+                Q(description__icontains=search_param)
+            )
+
+        serializer = RepositorySerializer(queryset, many=True)
+        return Response(serializer.data)
+
+class UserSearchView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        search_param = request.query_params.get('q')
+        if not search_param:
+            raise ValidationError("You need a query param(q=) for search!")
+
+        queryset = CustomUser.objects.filter(
+            Q(username__icontains=search_param) |
+            Q(display_name__icontains=search_param)
+        )
+
+        serializer = UserSerializer(queryset, many=True)
+        return Response(serializer.data)
+
 # Create your views here.
