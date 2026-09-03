@@ -340,4 +340,40 @@ def test_retrieve_comment_not_allowed(db, comment, auth_client):
     )
     assert res.status_code == 405
 
+@pytest.mark.issues
+def test_search_issue(db, issue_on_private, auth_client):
+    issue, repo_id = issue_on_private
+    res = auth_client.get(f'/api/repositories/{repo_id}/issues/?q=private')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+@pytest.mark.issues
+def test_search_issue_private_non_owner(db, issue_on_private, auth_client2):
+    issue, repo_id = issue_on_private
+    res = auth_client2.get(f'/api/repositories/{repo_id}/issues/?q=private')
+
+    assert res.status_code == 403
+
+@pytest.mark.issues
+def test_search_issue_private_collaborator(db, issue_on_private, collaborator_private_repo, auth_client2):
+    issue, repo_id = issue_on_private
+    res = auth_client2.get(f'/api/repositories/{repo_id}/issues/?q=private')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+@pytest.mark.issues
+def test_get_issue_org_owner(db, issue_on_private_org_repo, auth_client):
+    issue, repo_id = issue_on_private_org_repo
+    res = auth_client.get(f'/api/repositories/{repo_id}/issues/?q=org')
+
+    assert res.status_code == 200
+    assert len(res.data) == 1
+
+
+
+
+    
+
 # Create your tests here.

@@ -1,11 +1,13 @@
 from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, mixins, permissions
 from .models import Issue, Comment
+from django.db.models import Q
 from apps.repositories.models import Repository
 from .serializers import IssueSerializer, CommentSerializer
 from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from apps.common.permissions import IsOwner
+from apps.organizations.models import OrgMember
 # Create your views here.
 
 
@@ -16,8 +18,17 @@ class IsOwnerOrCollaboratorOrPublic(permissions.BasePermission):
         if repo.visibility == "PUBLIC":
             return True
 
-        is_owner = repo.user == request.user    
-        is_collaborator = repo.collaborators.filter(pk=request.user.pk).exists()
+        is_owner = request.user == repo.user
+        if repo.organization is not None:
+            try:
+                member = OrgMember.objects.get(user=request.user, organization=repo.organization)
+            except OrgMember.DoesNotExist:
+                is_owner = False
+            else:
+                is_owner = member.role == "OWNER"
+
+          
+        is_collaborator = repo.collaborators.filter(user=request.user).exists()
 
         return is_owner or is_collaborator
 
@@ -37,7 +48,16 @@ class IssueViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def get_queryset(self):
-        return Issue.objects.filter(repository=self.kwargs["repository_pk"]).prefetch_related("comments")
+        queryset = Issue.objects.filter(repository=self.kwargs["repository_pk"]).prefetch_related("comments")
+
+        search_param = self.request.query_params.get('q')
+        if search_param:
+            queryset = queryset.filter(
+                Q(title__icontains=search_param) |
+                Q(description__icontains=search_param)
+            )
+
+        return queryset
 
     def perform_create(self, serializer):
         repo = get_object_or_404(Repository, pk=self.kwargs["repository_pk"])
