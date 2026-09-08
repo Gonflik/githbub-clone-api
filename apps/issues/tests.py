@@ -371,6 +371,34 @@ def test_get_issue_org_owner(db, issue_on_private_org_repo, auth_client):
     assert res.status_code == 200
     assert len(res.data) == 1
 
+import json
+@pytest.mark.issues
+def test_core_label(db, issue, auth_client):
+    issue_res, repo_id = issue
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/labels/',
+                           data={
+                               "name": "Newlabel"
+                           })
+
+    assert res.status_code == 201
+
+    print(res.data)
+    label_id = res.data["id"]
+    print("--------------------------",res.data["id"])
+
+    res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/labels/',
+                           data={
+                               "labels": [label_id],
+                           },
+                           content_type="application/json")
+
+    assert res.status_code == 204
+
+    res = auth_client.get(f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/')
+    print(json.dumps(res.data, indent=2, default=str))
+    assert res.status_code == 200
+
 
 
 
