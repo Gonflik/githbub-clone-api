@@ -50,7 +50,7 @@ def test_issue_index_non_authenticated(db, issue, api_client):
     res = api_client.get(f'/api/repositories/{repo_id}/issues/')
 
     assert res.status_code == 200
-    assert res.data[0]["title"] == "someissue"
+    assert res.data["results"][0]["title"] == "someissue"
 
 @pytest.mark.issues
 def test_issue_on_private_repo_index_non_author(db, issue_on_private, auth_client2):
@@ -65,7 +65,7 @@ def test_issue_on_private_repo_index_author(db, issue_on_private, auth_client):
     res = auth_client.get(f'/api/repositories/{repo_id}/issues/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 
 @pytest.mark.issues
@@ -96,7 +96,7 @@ def test_issue_on_private_repo_show_author(db, issue_on_private, auth_client):
     res = auth_client.get(f'/api/repositories/{repo_id}/issues/{issue.data['id']}/')
 
     assert res.status_code == 200
-    assert res.data["title"] == "someissue"
+    assert res.data["title"] == "privateissue"
 
 @pytest.mark.issues
 def test_issue_update(db, issue, auth_client):
@@ -346,7 +346,7 @@ def test_search_issue(db, issue_on_private, auth_client):
     res = auth_client.get(f'/api/repositories/{repo_id}/issues/?q=private')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.issues
 def test_search_issue_private_non_owner(db, issue_on_private, auth_client2):
@@ -361,7 +361,7 @@ def test_search_issue_private_collaborator(db, issue_on_private, collaborator_pr
     res = auth_client2.get(f'/api/repositories/{repo_id}/issues/?q=private')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.issues
 def test_get_issue_org_owner(db, issue_on_private_org_repo, auth_client):
@@ -369,9 +369,8 @@ def test_get_issue_org_owner(db, issue_on_private_org_repo, auth_client):
     res = auth_client.get(f'/api/repositories/{repo_id}/issues/?q=org')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
-import json
 @pytest.mark.issues
 def test_core_label(db, issue, auth_client):
     issue_res, repo_id = issue
@@ -383,9 +382,7 @@ def test_core_label(db, issue, auth_client):
 
     assert res.status_code == 201
 
-    print(res.data)
     label_id = res.data["id"]
-    print("--------------------------",res.data["id"])
 
     res = auth_client.post(f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/labels/',
                            data={
@@ -396,8 +393,66 @@ def test_core_label(db, issue, auth_client):
     assert res.status_code == 204
 
     res = auth_client.get(f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/')
-    print(json.dumps(res.data, indent=2, default=str))
     assert res.status_code == 200
+
+
+@pytest.mark.issues
+def test_issue_filter_by_label(db, issue, auth_client):
+    issue_res, repo_id = issue
+
+    label_res = auth_client.post(f'/api/repositories/{repo_id}/labels/', 
+                                data={"name": "bug"})
+    
+    assert label_res.status_code == 201
+
+    label_id = label_res.data["id"]
+
+    auth_client.post(
+        f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/labels/',
+        data={"labels": [label_id]},
+        content_type="application/json"
+    )
+
+    no_label_issue = auth_client.post(f'/api/repositories/{repo_id}/issues/', data={
+        "title": "No label issue",
+        "description": "should not appear",
+    })
+    assert no_label_issue.status_code == 201
+
+    res = auth_client.get(f'/api/repositories/{repo_id}/issues/?label={label_id}')
+
+    assert res.status_code == 200
+
+    issue_ids = [i["id"] for i in res.data["results"]]
+
+    assert issue_res.data["id"] in issue_ids
+    assert no_label_issue.data["id"] not in issue_ids
+
+
+@pytest.mark.issues
+def test_issue_filter_by_multiple_labels(db, issue, auth_client):
+    issue_res, repo_id = issue
+
+    label1 = auth_client.post(f'/api/repositories/{repo_id}/labels/', 
+                              data={"name": "bug"}).data
+    label2 = auth_client.post(f'/api/repositories/{repo_id}/labels/', 
+                              data={"name": "urgent"}).data
+
+    auth_client.post(
+        f'/api/repositories/{repo_id}/issues/{issue_res.data["id"]}/labels/',
+        data={"labels": [label1["id"], label2["id"]]},
+        content_type="application/json"
+    )
+
+    res = auth_client.get(f'/api/repositories/{repo_id}/issues/?label={label1["id"]}&label={label2["id"]}')
+    assert res.status_code == 200
+
+    issue_ids = [i["id"] for i in res.data["results"]]
+    assert issue_res.data["id"] in issue_ids
+
+    assert len(issue_ids) == len(set(issue_ids))
+
+
 
 
 

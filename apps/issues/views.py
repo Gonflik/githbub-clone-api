@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 from apps.common.permissions import IsOwner
 from apps.organizations.models import OrgMember
+from apps.common.pagination import StandardPagination
 # Create your views here.
 
 
@@ -25,7 +26,9 @@ class IsOwnerOrCollaboratorOrPublic(permissions.BasePermission):
         if not self._skip_public:
             if repo.visibility == "PUBLIC":
                 return True
-
+            else:
+                if not request.user.is_authenticated:
+                    return False
         is_owner = request.user == repo.user
         if repo.organization is not None:
             try:
@@ -45,6 +48,7 @@ class IssueViewSet(viewsets.ModelViewSet):
     serializer_class = IssueSerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
 
     def get_permissions(self):
         if self.action in ["retrieve", "list"]:
@@ -59,6 +63,9 @@ class IssueViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Issue.objects.filter(repository=self.kwargs["repository_pk"]).prefetch_related("comments")
+        label_ids = self.request.query_params.getlist('label')
+        if label_ids:
+            queryset = queryset.filter(labels__id__in=label_ids).distinct()
 
         search_param = self.request.query_params.get('q')
         if search_param:

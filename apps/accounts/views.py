@@ -11,6 +11,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.exceptions import ValidationError
 from .serializers import RegisterSerializer, UserSerializer, LoginSerializer
 from .models import CustomUser
+from apps.common.pagination import StandardPagination
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -83,6 +84,7 @@ class LogoutView(APIView):
 
 class RepositoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
 
     def get(self, request, username=None):
         from apps.repositories.serializers import RepositorySerializer
@@ -103,11 +105,16 @@ class RepositoryView(APIView):
                 Q(description__icontains=search_param)
             )
 
-        serializer = RepositorySerializer(queryset, many=True)
-        return Response(serializer.data)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+
+        serializer = RepositorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 class UserSearchView(APIView):
     permission_classes = [permissions.AllowAny]
+    pagination_class = StandardPagination
+
 
     def get(self, request):
         search_param = request.query_params.get('q')
@@ -119,7 +126,10 @@ class UserSearchView(APIView):
             Q(display_name__icontains=search_param)
         )
 
-        serializer = UserSerializer(queryset, many=True)
-        return Response(serializer.data)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+
+        serializer = UserSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 # Create your views here.

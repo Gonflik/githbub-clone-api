@@ -12,6 +12,7 @@ from .models import Repository, Star, Collaborator
 from apps.invitations.models import Invitation
 from apps.accounts.models import CustomUser
 from apps.organizations.models import OrgMember
+from apps.common.pagination import StandardPagination
 # Create your views here.
 
 
@@ -68,6 +69,7 @@ class RepositoryViewSet(viewsets.ModelViewSet):
     serializer_class = RepositorySerializer
     http_method_names = ['get', 'post', 'patch', 'delete']
     permission_classes = [IsOwnerOrOrgStuff]
+    pagination_class = StandardPagination
 
     def get_permissions(self):
         if self.action == "list":

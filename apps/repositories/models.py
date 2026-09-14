@@ -25,6 +25,7 @@ class Repository(models.Model):
         related_name="starred_repositories"
     )
     class Meta:
+        ordering = ["name"]
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "name"],

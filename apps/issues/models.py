@@ -30,6 +30,9 @@ class Issue(models.Model):
 
     labels = models.ManyToManyField(Label, related_name="issues", blank=True)
 
+    class Meta:
+        ordering = ["title"]
+
 
 class Comment(models.Model):
     contents = models.TextField()

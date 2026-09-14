@@ -129,38 +129,71 @@ def test_get_user_repositories(db, auth_client, repo, repo2, private_repo):
     res = auth_client.get(f'/api/users/testuser/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 3
+    assert len(res.data["results"]) == 3
 
 @pytest.mark.accounts
 def test_get_user_repositories_search(db, auth_client, repo, repo2, private_repo):
     res = auth_client.get(f'/api/users/testuser/repositories/?q=private')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.accounts
 def test_get_user_repositories_non_owner(db, auth_client2, repo, repo2, private_repo):
     res = auth_client2.get(f'/api/users/testuser/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 2
+    assert len(res.data["results"]) == 2
 
 @pytest.mark.accounts
 def test_get_user_repositories_collaborator(db, auth_client2, repo, repo2, private_repo, collaborator_private_repo):
     res = auth_client2.get(f'/api/users/testuser/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 3
+    assert len(res.data["results"]) == 3
 
 @pytest.mark.accounts
 def test_search_users_non_auth(db, another_user, another_user2, api_client):
     res = api_client.get('/api/users/?q=another')
 
     assert res.status_code == 200
-    print(res.data)
+    print(res.data["results"])
+    assert len(res.data["results"]) == 2
 
-    assert len(res.data) == 2
 
+
+
+
+@pytest.mark.accounts
+def test_user_repos_pagination(db, auth_client, user, repo, repo2, private_repo):
+    res = auth_client.get(f'/api/users/{user.username}/repositories/?per_page=2')
+
+    assert res.status_code == 200
+    assert len(res.data["results"]) == 2
+    assert res.data["count"] == 3
+    assert res.data["next"] is not None
+
+    res = auth_client.get(f'/api/users/{user.username}/repositories/?per_page=2&page=2')
+
+    assert res.status_code == 200
+    assert len(res.data["results"]) == 1
+    assert res.data["next"] is None
+
+
+@pytest.mark.accounts
+def test_user_search_pagination(db, api_client, another_user, another_user2):
+    res = api_client.get('/api/users/?q=another&per_page=1')
+    
+    assert res.status_code == 200
+    assert len(res.data["results"]) == 1
+    assert res.data["count"] == 2
+    assert res.data["next"] is not None
+
+    res = api_client.get('/api/users/?q=another&per_page=1&page=2')
+
+    assert res.status_code == 200
+    assert len(res.data["results"]) == 1
+    assert res.data["next"] is None
 
 
 # Create your tests here.

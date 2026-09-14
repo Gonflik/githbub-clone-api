@@ -54,14 +54,14 @@ def test_repo_index_not_authenticated(db, api_client):
 @pytest.mark.repositories
 def test_repo_index_filter_private_for_non_author(db, private_repo, repo, auth_client2):
     res = auth_client2.get('/api/repositories/')
-    for i in res.data:
+    for i in res.data["results"]:
         assert i["visibility"] == "PUBLIC"
 
 @pytest.mark.repositories
 def test_repo_index_not_filter_priv_for_author(db, private_repo, auth_client):
     res = auth_client.get('/api/repositories/')
 
-    assert res.data[0]["visibility"] == "PRIVATE"
+    assert res.data["results"][0]["visibility"] == "PRIVATE"
 
 @pytest.mark.repositories
 def test_repo_show_non_authenticated(db, api_client, repo):
@@ -426,7 +426,8 @@ def test_owner_list_org_repo(db, organization, auth_client, org_repo, org_repo_p
     res = auth_client.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 2
+    print(res.data)
+    assert len(res.data["results"]) == 2
 
 @pytest.mark.repositories
 def test_non_auth_list_org_repo(db, organization, api_client, org_repo, org_repo_private):
@@ -434,7 +435,7 @@ def test_non_auth_list_org_repo(db, organization, api_client, org_repo, org_repo
     res = api_client.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.repositories
 def test_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo_private, org_member_user2):
@@ -442,7 +443,7 @@ def test_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo
     res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.repositories
 def test_non_member_list_org_repo(db, organization, auth_client2, org_repo, org_repo_private):
@@ -450,7 +451,7 @@ def test_non_member_list_org_repo(db, organization, auth_client2, org_repo, org_
     res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
 
 @pytest.mark.repositories
 def test_retrieve_org_repo(db, organization, org_repo, auth_client):
@@ -802,7 +803,7 @@ def test_collaborator_sees_private_org_repo_in_list(db, organization, org_repo_p
     res = auth_client2.get(f'/api/organizations/{org_name}/repositories/')
 
     assert res.status_code == 200
-    assert len(res.data) == 1
+    assert len(res.data["results"]) == 1
     
 
 
