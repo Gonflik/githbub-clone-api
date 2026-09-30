@@ -42,7 +42,30 @@ class Repository(models.Model):
 
     def __str__(self):
         return f"{self.id}: {self.name}"
+
+
+class Commit(models.Model):
+    hash = models.CharField(max_length=64, unique=True)
+    tree_hash = models.CharField(max_length=64)
     
+    parent_id = models.IntegerField(null=True)
+    message = models.CharField(max_length=100)
+
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="commits")
+    user = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE, related_name="commits")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class Branch(models.Model):
+    name = models.CharField(max_length=60)
+    head_commit_id = models.IntegerField(null=True)
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="branches")
+
+    class Meta:
+        unique_together = ("name", "repository")
+
+
+
 class Star(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
