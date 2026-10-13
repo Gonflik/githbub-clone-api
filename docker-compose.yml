@@ -4,6 +4,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     env_file: .env
+  minio:
+    image: quay.io/minio/aistor/minio:latest
+    command: server /data --console-address ":9001" --license /minio.license
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+      - ./minio.license:/minio.license:ro
+    env_file: .env
 
   web:
     build: .
@@ -21,3 +31,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

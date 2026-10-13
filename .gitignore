@@ -1,2 +1,4 @@
 __pycache__/
 .env
+minio.license
+*.egg-info
