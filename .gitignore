@@ -4,3 +4,4 @@ minio.license
 *.egg-info
 .dranik_config.json
 .dranik_index.json
+.dranikignore
