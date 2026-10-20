@@ -85,7 +85,7 @@ def init():
     CONFIG_FILE.write_text(json.dumps(config_data, indent=4))
     IGNORE_FILE.write_text(basic_ignore_str)
 
-    typer.echo(f"You initialized in '{absolute_path}', also created a default ignore file  '{IGNORE_FILE}'")
+    typer.echo(f"You initialized in '{absolute_path}', also created a default ignore file  '{IGNORE_FILE.absolute()}'")
 
 @app.command()
 def listshi():
@@ -118,22 +118,28 @@ def add(filename: str):
                 if item.is_file() and item.name == target_file:
                     relative = item.relative_to(init_path)
                     index[str(relative)] = hash_file_and_name(item)
+                if item.is_dir() and item.name == target_file:
+                    go_through_dir(item)
             else:
                 if item.is_file():
                     relative = item.relative_to(init_path)
                     index[str(relative)] = hash_file_and_name(item)
-            if item.is_dir():
-                go_through_dir(item, target_file)
+                if item.is_dir():
+                    go_through_dir(item)
 
         return index
 
+    if filename == ".":
+        index = go_through_dir(init_path)
     if filename in get_ignore_list():
         typer.echo("The file is in '.dranikignore' or cannot be staged!")
         raise typer.Abort()
-    if filename == ".":
-        index = go_through_dir(init_path)
     else:
-        index = go_through_dir(init_path, filename)
+        index = go_through_dir(Path.cwd(), filename)
+
+    if index == {}:
+        typer.echo(f"Target {filename} was not found in this directory!")
+        raise typer.Exit(code=1)
 
     index_file = get_init_path() / INDEX_FILE
     if index_file.exists():
