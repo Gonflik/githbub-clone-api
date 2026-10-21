@@ -108,6 +108,14 @@ def listshi():
 @app.command()
 def add(filename: str):
     init_path = get_init_path()
+
+    if filename != ".":
+        path = (Path.cwd() / filename).resolve()
+
+        if not path.is_relative_to(init_path.resolve()):
+            typer.echo("Cannot stage files outside of repository!")
+            raise typer.Exit(code=1)
+
     index = dict()
     
     def go_through_dir(folder_path, target_file = None):
@@ -131,14 +139,17 @@ def add(filename: str):
 
     if filename == ".":
         index = go_through_dir(init_path)
-    if filename in get_ignore_list():
+    elif filename in get_ignore_list():
         typer.echo("The file is in '.dranikignore' or cannot be staged!")
         raise typer.Abort()
+    elif "/" in filename:
+        path = Path(filename)
+        index = go_through_dir(path.parent.absolute(), path.name)
     else:
         index = go_through_dir(Path.cwd(), filename)
 
     if index == {}:
-        typer.echo(f"Target {filename} was not found in this directory!")
+        typer.echo(f"No stageable files found for '{filename}'.")
         raise typer.Exit(code=1)
 
     index_file = get_init_path() / INDEX_FILE
