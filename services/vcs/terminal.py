@@ -1,17 +1,18 @@
 import typer
 import json
 import hashlib
+import gzip
 from pathlib import Path
 from rich import print
 
 app = typer.Typer(help="Git-like vcs made by dranisama")
 
-CONFIG_FILE = Path(".dranik_config.json")
-INDEX_FILE = Path(".dranik_index.json")
+CONFIG_FILE = Path(".dranik/config.json")
+INDEX_FILE = Path(".dranik/index.json")
 IGNORE_FILE = Path(".dranikignore")
-default_ignore_list = {".dranik_index.json", ".dranik_config.json"}
+default_ignore_list = {".dranik"}
 
-def get_ignore_list() -> list:
+def get_ignore_list() -> set[str]:
     init_path = get_init_path()
     ignore_file = init_path / IGNORE_FILE
     ignore_list = ignore_file.read_text().splitlines()
@@ -26,6 +27,17 @@ def fing_config_file():
             return config_path
         
     return None
+
+def get_index_data() -> dict:
+    init_path = get_init_path()
+    index_file = init_path / INDEX_FILE
+    
+    try:
+        data = json.loads(index_file.read_text())
+        return data
+    except (json.JSONDecodeError):
+        typer.echo("Invalid index file!")
+        raise typer.Exit(code=1)
 
 def get_init_path():
     config_file = fing_config_file()
@@ -42,17 +54,31 @@ def get_init_path():
         raise typer.Exit(code=1)
 
 
-def hash_file_and_name(file_path: Path):
+def hash_file(file_path: Path):
     hasher = hashlib.sha256()
-
-    file_name = file_path.name
-    hasher.update(file_name.encode('utf-8'))
 
     with file_path.open("rb") as f:
         while chunk := f.read(65536):
             hasher.update(chunk)
 
     return hasher.hexdigest()
+
+def store_file(file_path: Path, file_hash: str):
+    init_path = get_init_path()
+
+    object_file = init_path / Path(f".dranik/objects/{file_hash}")
+    object_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if object_file.exists():
+        return
+
+    with file_path.open("rb") as src, object_file.open("wb") as raw_dst:
+        with gzip.GzipFile(fileobj=raw_dst, mode="wb") as dst:
+            while chunk := src.read(65536):
+                dst.write(chunk)
+
+
+    
 
 def update_json(new_data):
     index_file = get_init_path() / INDEX_FILE
@@ -80,8 +106,10 @@ def bark():
 def init():
     absolute_path = Path(".").resolve()
     basic_ignore_str = ".git\n.venv\n__pycache__\n.pytest_cache\n.env"
-
     config_data = {"init_path": str(absolute_path)}
+
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
     CONFIG_FILE.write_text(json.dumps(config_data, indent=4))
     IGNORE_FILE.write_text(basic_ignore_str)
 
@@ -125,13 +153,21 @@ def add(filename: str):
             if target_file is not None:
                 if item.is_file() and item.name == target_file:
                     relative = item.relative_to(init_path)
-                    index[str(relative)] = hash_file_and_name(item)
+                    file_hash = hash_file(item)
+                
+                    store_file(item.absolute(), file_hash)
+                    index[str(relative)] = file_hash
+
                 if item.is_dir() and item.name == target_file:
                     go_through_dir(item)
             else:
                 if item.is_file():
                     relative = item.relative_to(init_path)
-                    index[str(relative)] = hash_file_and_name(item)
+                    file_hash = hash_file(item)
+
+                    store_file(item.absolute(), file_hash)
+                    index[str(relative)] = file_hash
+                    
                 if item.is_dir():
                     go_through_dir(item)
 
@@ -164,6 +200,19 @@ def add(filename: str):
     
     index_file.write_text(json.dumps(index, indent=4))
     typer.echo(f"Created index file at {index_file.absolute()}")
+
+@app.command()
+def commit(message: str):
+    if len(message) == 0:
+        typer.echo("You need to write a commit message!")
+        raise typer.Exit(code=1)
+
+    index = get_index_data()
+
+    for key, value in index.items():
+        pass
+
+
     
 
     
