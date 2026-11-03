@@ -4,6 +4,7 @@ import hashlib
 import gzip
 from pathlib import Path
 from rich import print
+from datetime import datetime, timezone
 
 app = typer.Typer(help="Git-like vcs made by dranisama")
 
@@ -54,6 +55,43 @@ def get_init_path():
         raise typer.Exit(code=1)
 
 
+def get_head_commit():
+    config_file = fing_config_file()
+
+    if config_file is None:
+        typer.echo("You need to 'dranik init' in root folder before using other commands!")
+        raise typer.Exit(code=1)
+
+    try:
+        data = json.loads(config_file.read_text())
+        return data.get("head")
+    except (json.JSONDecodeError, KeyError, TypeError):
+        typer.echo("Invalid Dranik config file!")
+        raise typer.Exit(code=1)
+
+def write_head(commit_hash):
+    config_file = fing_config_file()
+
+    if config_file is None:
+        typer.echo("You need to 'dranik init' in root folder before using other commands!")
+        raise typer.Exit(code=1)
+
+    try:
+        data = json.loads(config_file.read_text())
+        data["head"] = commit_hash
+        config_file.write_text(json.dumps(data, indent=4))
+    except (json.JSONDecodeError, KeyError, TypeError):
+        typer.echo("Invalid Dranik config file!")
+        raise typer.Exit(code=1)  
+    
+def serialize_dik(data: dict) -> bytes:
+    return json.dumps(
+        data,
+        sort_keys=True,
+        indent=4
+    ).encode()
+
+
 def hash_file(file_path: Path):
     hasher = hashlib.sha256()
 
@@ -96,6 +134,42 @@ def update_json(new_data):
     else:
         return False
 
+def index_into_nested_dict(current_data):
+    result = dict()
+
+    for key in current_data.keys():
+        current = result
+        splitted = key.split('/')
+        
+        for i in splitted:
+            if i == splitted[-1]:
+                current[i] = current_data[key]
+            else:
+                if i not in current:
+                    current[i] = {}
+                current = current[i] 
+
+    return result
+
+
+def nested_to_tree_objects(nested_dik: dict):
+    res = dict()
+    for key in nested_dik.keys():
+        if not isinstance(nested_dik[key], dict):
+            res[key] = {"type": "blob", "hash": nested_dik[key]}
+        else:
+            res[key] = {"type": "tree", "hash": nested_to_tree_objects(nested_dik[key])}
+
+
+    serialized = serialize_dik(res)
+    tree_hash = hashlib.sha256(serialized).hexdigest()
+    object_file = get_init_path() / Path(f".dranik/objects/{tree_hash}")
+    if not object_file.exists():
+        object_file.write_bytes(serialized)
+    
+
+    return tree_hash
+
 @app.command()
 def bark():
     init_path = get_init_path()
@@ -106,7 +180,7 @@ def bark():
 def init():
     absolute_path = Path(".").resolve()
     basic_ignore_str = ".git\n.venv\n__pycache__\n.pytest_cache\n.env"
-    config_data = {"init_path": str(absolute_path)}
+    config_data = {"init_path": str(absolute_path), "head": None}
 
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -137,12 +211,14 @@ def listshi():
 def add(filename: str):
     init_path = get_init_path()
 
-    if filename != ".":
+    if filename == ".":
+        path = Path.cwd().resolve()
+    else:
         path = (Path.cwd() / filename).resolve()
 
-        if not path.is_relative_to(init_path.resolve()):
-            typer.echo("Cannot stage files outside of repository!")
-            raise typer.Exit(code=1)
+    if not path.is_relative_to(init_path.resolve()):
+        typer.echo("Cannot stage files outside of repository!")
+        raise typer.Exit(code=1)
 
     index = dict()
     
@@ -174,7 +250,7 @@ def add(filename: str):
         return index
 
     if filename == ".":
-        index = go_through_dir(init_path)
+        index = go_through_dir(path)
     elif filename in get_ignore_list():
         typer.echo("The file is in '.dranikignore' or cannot be staged!")
         raise typer.Abort()
@@ -207,13 +283,35 @@ def commit(message: str):
         typer.echo("You need to write a commit message!")
         raise typer.Exit(code=1)
 
-    index = get_index_data()
+    index_path = get_init_path() / ".dranik" / "index.json"
+    if not index_path.exists():
+        typer.echo("Nothing to commit. Use 'dranik add' first!")
+        raise typer.Exit(code=1)
 
-    for key, value in index.items():
-        pass
+    current_data = get_index_data()
+    if not current_data:
+        typer.echo("Nothing to commit! The staging area is empty!!1")
+        raise typer.Exit(code=1)
+
+    tree_hash = nested_to_tree_objects(index_into_nested_dict(current_data))
+
+    commit_data = {
+        "tree": tree_hash,
+        "parent": get_head_commit(),
+        "message": message,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
 
 
-    
+    serialized = serialize_dik(commit_data)
+
+    commit_hash = hashlib.sha256(serialized).hexdigest()
+    object_file = get_init_path() / Path(f".dranik/objects/{commit_hash}")
+    object_file.write_bytes(serialized)
+
+    write_head(commit_hash)
+
+    typer.echo("Commited succesfully!")
 
     
 @app.command()
