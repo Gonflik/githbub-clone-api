@@ -91,6 +91,17 @@ def serialize_dik(data: dict) -> bytes:
         indent=4
     ).encode()
 
+def read_commit(file_hash: str):
+    init_path = get_init_path()
+    commit_file = init_path / ".dranik" / "objects" / file_hash
+    
+    try:
+        data = json.loads(commit_file.read_text())
+        return data
+    except (json.JSONDecodeError):
+        typer.echo("Invalid index file!")
+        raise typer.Exit(code=1)
+
 
 def hash_file(file_path: Path):
     hasher = hashlib.sha256()
@@ -294,6 +305,10 @@ def commit(message: str):
         raise typer.Exit(code=1)
 
     tree_hash = nested_to_tree_objects(index_into_nested_dict(current_data))
+    if tree_hash == read_commit(get_head_commit()).get("tree"):
+        typer.echo("Cant commit with no changes!")
+        raise typer.Exit(code=1)
+
 
     commit_data = {
         "tree": tree_hash,
@@ -312,6 +327,22 @@ def commit(message: str):
     write_head(commit_hash)
 
     typer.echo("Commited succesfully!")
+
+@app.command()
+def log():
+    head = get_head_commit()
+    if head is None:
+        typer.echo("No head commit! Cant build a history.")
+        raise typer.Exit(code=1)
+
+    history = []
+    current = head
+    while current:
+        history.append(read_commit(current))
+        next_parent = read_commit(current).get("parent")
+        current = next_parent
+
+    print(history)
 
     
 @app.command()
