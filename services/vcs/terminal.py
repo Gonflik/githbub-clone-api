@@ -329,7 +329,7 @@ def commit(message: str):
     typer.echo("Commited succesfully!")
 
 @app.command()
-def log():
+def log(graph: bool = typer.Option(False, "--graph", help="Show as commit graph")):
     head = get_head_commit()
     if head is None:
         typer.echo("No head commit! Cant build a history.")
@@ -338,11 +338,29 @@ def log():
     history = []
     current = head
     while current:
-        history.append(read_commit(current))
-        next_parent = read_commit(current).get("parent")
+        commit_data = read_commit(current)
+        history.append((current, commit_data))
+        next_parent = commit_data.get("parent")
         current = next_parent
 
-    print(history)
+    for i, (commit_hash, info) in enumerate(history):
+        raw_data = info.get("created_at", "")
+        try:
+            dt = datetime.fromisoformat(raw_data)
+            date_str = dt.strftime("%a %b %d %H:%M:%S %Y %z")
+        except ValueError:
+            date_str = raw_data
+
+        if graph:
+            print(f"* [yellow]{commit_hash}[/yellow] [bright_black]{date_str}[/bright_black]")
+            print(f"|  {info.get("message")}")
+            if len(history)-1 <= i:
+                return
+            print("|")
+        else:
+            print(f"commit [yellow]{commit_hash}[/yellow]  (tree: {info.get("tree")})")
+            print(f"Date:   [bright_black]{date_str}[/bright_black]\n")
+            print(f"    {info.get("message")}\n")
 
     
 @app.command()
