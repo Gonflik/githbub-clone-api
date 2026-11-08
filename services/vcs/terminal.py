@@ -11,6 +11,8 @@ app = typer.Typer(help="Git-like vcs made by dranisama")
 CONFIG_FILE = Path(".dranik/config.json")
 INDEX_FILE = Path(".dranik/index.json")
 IGNORE_FILE = Path(".dranikignore")
+HEAD_FILE = Path(".dranik/HEAD")
+DEFAULT_BRANCH_FILE = Path(".dranik/refs/heads/main")
 default_ignore_list = {".dranik"}
 
 def get_ignore_list() -> set[str]:
@@ -55,34 +57,30 @@ def get_init_path():
         raise typer.Exit(code=1)
 
 
+#this too bruv
 def get_head_commit():
-    config_file = fing_config_file()
+    init_path = get_init_path()
+    head_file = init_path / HEAD_FILE
 
-    if config_file is None:
-        typer.echo("You need to 'dranik init' in root folder before using other commands!")
-        raise typer.Exit(code=1)
+    head_content = head_file.read_text().strip()
+    current_branch = head_content.removeprefix("ref: ")
 
-    try:
-        data = json.loads(config_file.read_text())
-        return data.get("head")
-    except (json.JSONDecodeError, KeyError, TypeError):
-        typer.echo("Invalid Dranik config file!")
-        raise typer.Exit(code=1)
+    branch_file = init_path / current_branch
 
+    head_commit_hash = branch_file.read_text().strip()
+
+    return head_commit_hash or None
+
+#change this for branching
 def write_head(commit_hash):
-    config_file = fing_config_file()
+    init_path = get_init_path()
+    head_file = init_path / HEAD_FILE
 
-    if config_file is None:
-        typer.echo("You need to 'dranik init' in root folder before using other commands!")
-        raise typer.Exit(code=1)
+    head_content = head_file.read_text().strip()
+    current_branch = head_content.removeprefix("ref: ")
 
-    try:
-        data = json.loads(config_file.read_text())
-        data["head"] = commit_hash
-        config_file.write_text(json.dumps(data, indent=4))
-    except (json.JSONDecodeError, KeyError, TypeError):
-        typer.echo("Invalid Dranik config file!")
-        raise typer.Exit(code=1)  
+    branch_file = init_path / current_branch
+    branch_file.write_text(commit_hash)
     
 def serialize_dik(data: dict) -> bytes:
     return json.dumps(
@@ -92,6 +90,9 @@ def serialize_dik(data: dict) -> bytes:
     ).encode()
 
 def read_commit(file_hash: str):
+    if file_hash is None or len(file_hash) < 64:
+        return {}
+
     init_path = get_init_path()
     commit_file = init_path / ".dranik" / "objects" / file_hash
     
@@ -191,12 +192,15 @@ def bark():
 def init():
     absolute_path = Path(".").resolve()
     basic_ignore_str = ".git\n.venv\n__pycache__\n.pytest_cache\n.env"
-    config_data = {"init_path": str(absolute_path), "head": None}
+    config_data = {"init_path": str(absolute_path)}
 
     CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_BRANCH_FILE.parent.mkdir(parents=True, exist_ok=True)
 
     CONFIG_FILE.write_text(json.dumps(config_data, indent=4))
     IGNORE_FILE.write_text(basic_ignore_str)
+    DEFAULT_BRANCH_FILE.touch()
+    HEAD_FILE.write_text(f"ref: {DEFAULT_BRANCH_FILE}")
 
     typer.echo(f"You initialized in '{absolute_path}', also created a default ignore file  '{IGNORE_FILE.absolute()}'")
 
@@ -317,7 +321,6 @@ def commit(message: str):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
-
     serialized = serialize_dik(commit_data)
 
     commit_hash = hashlib.sha256(serialized).hexdigest()
@@ -325,6 +328,7 @@ def commit(message: str):
     object_file.write_bytes(serialized)
 
     write_head(commit_hash)
+    index_path.write_text("{}")
 
     typer.echo("Commited succesfully!")
 
@@ -354,7 +358,7 @@ def log(graph: bool = typer.Option(False, "--graph", help="Show as commit graph"
         if graph:
             print(f"* [yellow]{commit_hash}[/yellow] [bright_black]{date_str}[/bright_black]")
             print(f"|  {info.get("message")}")
-            if len(history)-1 <= i:
+            if len(history) <= i:
                 return
             print("|")
         else:
@@ -362,6 +366,47 @@ def log(graph: bool = typer.Option(False, "--graph", help="Show as commit graph"
             print(f"Date:   [bright_black]{date_str}[/bright_black]\n")
             print(f"    {info.get("message")}\n")
 
+
+@app.command()
+def branch(name: str = typer.Argument(None, help="Pass name to create a branch")):
+    init_path = get_init_path()
+    if name is None:
+        head_file = init_path / HEAD_FILE
+        head_content = head_file.read_text().strip()
+        current_branch = head_content.removeprefix("ref: ").split("/")
+        print(f"Currently on branch [green]{current_branch[-1]}[/green]")
+        raise typer.Exit(code=1)
+    
+    branch_file = init_path / ".dranik" / "refs" / "heads" / name
+
+    if branch_file.exists():
+        print(f"[red]Branch [bold]{name}[/bold] already exists![/red]")
+        raise typer.Exit(code=1)
+
+    branch_file.write_text(get_head_commit() or "")
+
+    print(f"Succesfully created branch [green]'{name}'[/green]\nUse [bright_black]dranik switch[/bright_black] to switch between branches.")
+    raise typer.Exit(code=0)
+
+@app.command()
+def switch(branch_name):
+    init_path = get_init_path()
+    
+    if get_index_data() != {}:
+        print(f"[red]Cant switch until staged changes are commited![/red]")
+        raise typer.Exit(code=1)
+
+    branch_file = init_path / ".dranik" / "refs" / "heads" / branch_name
+
+    if not branch_file.is_file():
+        print(f"[red]No branch named [bold]'{branch_name}'[/bold]![/red]")
+        raise typer.Exit(code=1)
+    
+
+    head_file = init_path / HEAD_FILE
+    head_file.write_text(f"ref: {branch_file.relative_to(init_path)}")
+    print(f"Switched to branch [green]{branch_name}[/green]")
+    raise typer.Exit(code=0)
     
 @app.command()
 def shyshalnik():
