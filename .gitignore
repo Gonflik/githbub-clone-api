@@ -4,3 +4,4 @@ minio.license
 *.egg-info
 .dranik
 .dranikignore
+testing_vcs

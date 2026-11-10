@@ -164,20 +164,21 @@ def index_into_nested_dict(current_data):
     return result
 
 
-def nested_to_tree_objects(nested_dik: dict):
+def nested_to_tree_objects(nested_dik: dict, write_files: bool = True):
     res = dict()
     for key in nested_dik.keys():
         if not isinstance(nested_dik[key], dict):
             res[key] = {"type": "blob", "hash": nested_dik[key]}
         else:
-            res[key] = {"type": "tree", "hash": nested_to_tree_objects(nested_dik[key])}
+            res[key] = {"type": "tree", "hash": nested_to_tree_objects(nested_dik[key], write_files)}
 
 
     serialized = serialize_dik(res)
     tree_hash = hashlib.sha256(serialized).hexdigest()
-    object_file = get_init_path() / Path(f".dranik/objects/{tree_hash}")
-    if not object_file.exists():
-        object_file.write_bytes(serialized)
+    if write_files:
+        object_file = get_init_path() / Path(f".dranik/objects/{tree_hash}")
+        if not object_file.exists():
+            object_file.write_bytes(serialized)
     
 
     return tree_hash
@@ -199,6 +200,7 @@ def init():
 
     CONFIG_FILE.write_text(json.dumps(config_data, indent=4))
     IGNORE_FILE.write_text(basic_ignore_str)
+    INDEX_FILE.write_text(json.dumps({}))
     DEFAULT_BRANCH_FILE.touch()
     HEAD_FILE.write_text(f"ref: {DEFAULT_BRANCH_FILE}")
 
@@ -275,11 +277,17 @@ def add(filename: str):
     else:
         index = go_through_dir(Path.cwd(), filename)
 
+    #before here type beat
+    index_file = get_init_path() / INDEX_FILE
+    # for key in get_index_data().keys():
+    #     for kekey in index.keys():
+    #         if filename in key.split("/") and not filename in kekey.split("/"):
+    #             pass #do something
     if index == {}:
         typer.echo(f"No stageable files found for '{filename}'.")
         raise typer.Exit(code=1)
 
-    index_file = get_init_path() / INDEX_FILE
+   
     if index_file.exists():
         updated = update_json(index)
         if updated:
@@ -328,7 +336,6 @@ def commit(message: str):
     object_file.write_bytes(serialized)
 
     write_head(commit_hash)
-    index_path.write_text("{}")
 
     typer.echo("Commited succesfully!")
 
@@ -391,8 +398,8 @@ def branch(name: str = typer.Argument(None, help="Pass name to create a branch")
 @app.command()
 def switch(branch_name):
     init_path = get_init_path()
-    
-    if get_index_data() != {}:
+
+    if read_commit(get_head_commit()).get("tree", nested_to_tree_objects({}, False)) != nested_to_tree_objects(index_into_nested_dict(get_index_data()), write_files=False):
         print(f"[red]Cant switch until staged changes are commited![/red]")
         raise typer.Exit(code=1)
 
